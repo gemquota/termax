@@ -1,0 +1,15 @@
+{
+  "pyr": "Run ./run.py with Python and forward arguments.",
+  "pym": "Run ./main.py with Python and forward arguments.",
+  "pyv": "Create a virtual environment, defaulting to .venv.",
+  "activate": "Activate a virtual environment, defaulting to .venv.",
+  "mkcd": "Create a directory and enter it.",
+  "take": "Create nested directories and enter the final directory.",
+  "up": "Move up N directory levels.",
+  "croot": "Jump to the Git repository root.",
+  "pyreq": "Write the current Python environment to requirements.txt.",
+  "pyserve": "Start Python's simple HTTP server.",
+  "extract": "Extract common archive formats.",
+  "tx explore": "Open the experimental visual directory navigator.",
+  "tx pulse": "Run a command with a terminal-output-reactive activity display."
+}
