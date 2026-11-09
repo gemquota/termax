@@ -78,9 +78,19 @@ if (( $+commands[lazygit] )); then alias lg='lazygit'; fi
 # TERMAX entry points
 alias txs='tx status'
 alias txd='tx doctor'
-alias txe='tx explore'
-alias txp='tx pulse'
-alias txv='tx visual'
+txe() {
+  local root="${TERMAX_REPO:-$HOME/termax}"
+  [[ -f "$root/experimental/termax_explore.py" ]] || root="$HOME/.local/share/termax"
+  [[ -f "$root/experimental/termax_explore.py" ]] || { print -u2 "TERMAX Explorer sidecar not found"; return 127; }
+  command python "$root/experimental/termax_explore.py" "$@"
+}
+txp() {
+  local root="${TERMAX_REPO:-$HOME/termax}"
+  [[ -f "$root/experimental/termax_pulse.py" ]] || root="$HOME/.local/share/termax"
+  [[ -f "$root/experimental/termax_pulse.py" ]] || { print -u2 "TERMAX Pulse sidecar not found"; return 127; }
+  command python "$root/experimental/termax_pulse.py" "$@"
+}
+alias txv='tx dashboard'
 
 # Small conveniences
 alias ports='ss -tulpen 2>/dev/null || netstat -tulpen 2>/dev/null'
