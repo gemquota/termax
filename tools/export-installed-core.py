@@ -21,7 +21,10 @@ MAX_TOTAL_BYTES = 100 * 1024 * 1024
 
 
 def is_excluded(path: Path) -> bool:
-    if any(part in EXCLUDED_DIRS for part in path.parts):
+    if any(
+        part in EXCLUDED_DIRS or part.startswith("backup-") or ".backup-" in part
+        for part in path.parts
+    ):
         return True
     if path.name in EXCLUDED_NAMES or path.name.startswith(".env."):
         return True
@@ -38,7 +41,7 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def export(source: Path, output: Path) -> tuple[int, str]:
+def export(source: Path, output: Path, *, force: bool = False) -> tuple[int, str]:
     required = (
         source / "VERSION",
         source / "termax/cli.py",
@@ -48,6 +51,12 @@ def export(source: Path, output: Path) -> tuple[int, str]:
     missing = [str(p) for p in required if not p.is_file()]
     if missing:
         raise ValueError("TERMAX source tree is incomplete: " + ", ".join(missing))
+    if output.is_symlink():
+        raise ValueError("refusing to replace a symlink output")
+    if output.exists() and not force:
+        raise FileExistsError(
+            f"output already exists: {output}; choose another --output or pass --force"
+        )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     candidates = []
@@ -79,7 +88,11 @@ def export(source: Path, output: Path) -> tuple[int, str]:
             if not members or any(not member.isfile() for member in members):
                 raise ValueError("archive verification failed")
         os.chmod(temp, 0o600)
-        os.replace(temp, output)
+        if force:
+            os.replace(temp, output)
+        else:
+            os.link(temp, output)
+            temp.unlink()
     except Exception:
         temp.unlink(missing_ok=True)
         raise
@@ -91,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=Path.home() / APP_REL)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace an existing archive at the selected output path",
+    )
     args = parser.parse_args(argv)
 
     shared = Path.home() / "storage/shared"
@@ -103,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     source = args.source.expanduser()
 
     try:
-        count, digest = export(source, output)
+        count, digest = export(source, output, force=args.force)
     except (OSError, ValueError, tarfile.TarError) as exc:
         parser.exit(2, f"ERROR: {exc}\n")
 
