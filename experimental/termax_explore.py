@@ -7,6 +7,7 @@ Destructive deletion is deliberately replaced with a reversible trash move.
 """
 from __future__ import annotations
 
+import argparse
 import os
 import shutil
 import stat
@@ -41,7 +42,8 @@ class Explorer:
         self.hidden = False
         self.query = ""
         self.preview = False
-        self.message = "Enter open | / filter | . hidden | p preview | o editor | n new | r rename | c copy | m move | d trash | q quit"
+        self.sixel = False
+        self.message = "Enter open | / filter | . hidden | p preview | v SIXEL preview | o editor | n new | r rename | c copy | m move | d trash | q quit"
         self.refresh()
 
     def refresh(self):
@@ -107,8 +109,14 @@ class Explorer:
             return
         try:
             width = max(20, shutil.get_terminal_size((80, 24)).columns - 2)
-            if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"} and shutil.which("chafa"):
-                subprocess.run(["chafa", "--size", f"{width}x{max(3, lines)}", str(path)], check=False)
+            image_exts = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+            if path.suffix.lower() in image_exts and self.sixel:
+                from termax_sixel import render_sixel
+                if render_sixel(path, width=width, height=max(8, lines * 3)):
+                    return
+                print(f"{YELLOW}SIXEL renderer unavailable; falling back to character preview.{RESET}")
+            if path.suffix.lower() in image_exts and shutil.which("chafa"):
+                subprocess.run(["chafa", "--format=symbols", "--size", f"{width}x{max(3, lines)}", str(path)], check=False)
                 return
             if shutil.which("bat"):
                 result = subprocess.run(
@@ -157,6 +165,10 @@ class Explorer:
             self.refresh()
         elif key == "p":
             self.preview = not self.preview
+        elif key == "v":
+            self.sixel = not self.sixel
+            self.preview = True
+            self.message = f"SIXEL preview {'enabled' if self.sixel else 'disabled'} (requires a SIXEL-capable terminal)"
         elif key == "o" and item and item.is_file() and not item.is_symlink():
             self.open_editor(item)
         elif key == "n":
@@ -252,9 +264,15 @@ class Explorer:
 
 
 def main():
-    start = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
+    parser = argparse.ArgumentParser(description="TERMAX visual filesystem explorer")
+    parser.add_argument("directory", nargs="?", default=".")
+    parser.add_argument("--sixel", action="store_true",
+                        help="enable SIXEL image previews (requires a SIXEL-capable terminal)")
+    args = parser.parse_args()
     try:
-        return Explorer(start).run()
+        explorer = Explorer(Path(args.directory))
+        explorer.sixel = args.sixel or os.environ.get("TERMAX_SIXEL") == "1"
+        return explorer.run()
     except Exception as exc:
         print(f"TERMAX Explorer error: {exc}", file=sys.stderr)
         return 1
