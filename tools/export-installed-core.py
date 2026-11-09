@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import shutil
 import tempfile
 import tarfile
 from pathlib import Path
@@ -91,8 +92,20 @@ def export(source: Path, output: Path, *, force: bool = False) -> tuple[int, str
         if force:
             os.replace(temp, output)
         else:
-            os.link(temp, output)
-            temp.unlink()
+            # O_EXCL makes creation fail atomically if the destination already
+            # exists, including a symlink. This avoids relying on os.link(),
+            # which is unavailable in some constrained Android Python builds.
+            fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                with os.fdopen(fd, "wb") as destination, temp.open("rb") as source_file:
+                    shutil.copyfileobj(source_file, destination)
+                    destination.flush()
+                    os.fsync(destination.fileno())
+            except Exception:
+                output.unlink(missing_ok=True)
+                raise
+            else:
+                temp.unlink()
     except Exception:
         temp.unlink(missing_ok=True)
         raise
