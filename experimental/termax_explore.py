@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import termios
 import tty
@@ -40,7 +41,7 @@ class Explorer:
         self.hidden = False
         self.query = ""
         self.preview = False
-        self.message = "Enter open | / filter | p preview | n new | r rename | c copy | m move | d trash | q quit"
+        self.message = "Enter open | / filter | . hidden | p preview | o editor | n new | r rename | c copy | m move | d trash | q quit"
         self.refresh()
 
     def refresh(self):
@@ -105,13 +106,26 @@ class Explorer:
                 print(f"{RED}{exc}{RESET}")
             return
         try:
+            width = max(20, shutil.get_terminal_size((80, 24)).columns - 2)
+            if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"} and shutil.which("chafa"):
+                subprocess.run(["chafa", "--size", f"{width}x{max(3, lines)}", str(path)], check=False)
+                return
+            if shutil.which("bat"):
+                result = subprocess.run(
+                    ["bat", "--color=always", "--style=plain", "--paging=never",
+                     "--line-range", f"1:{max(3, lines)}", str(path)],
+                    capture_output=True, text=True, errors="replace"
+                )
+                if result.returncode == 0:
+                    print(result.stdout, end="")
+                    return
             data = path.read_bytes()
             if b"\0" in data[:4096]:
                 print(f"{DIM}Binary file · {human_size(len(data))}{RESET}")
                 return
             text = data.decode("utf-8", "replace").splitlines()
             for line in text[:lines]:
-                print(DIM + line[:max(20, shutil.get_terminal_size((80,24)).columns-2)] + RESET)
+                print(DIM + line[:width] + RESET)
         except OSError as exc:
             print(f"{RED}Preview unavailable: {exc}{RESET}")
 
@@ -119,9 +133,22 @@ class Explorer:
         candidate = Path(value).expanduser()
         return (self.cwd / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
 
+    def open_editor(self, item: Path):
+        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+        editor = editor or next((name for name in ("nvim", "vim", "vi", "nano") if shutil.which(name)), "")
+        executable = shutil.which(editor) if editor else None
+        if not executable:
+            self.message = "No editor found. Set EDITOR or VISUAL."
+            return
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.original)
+        try:
+            subprocess.call([executable, str(item)])
+        finally:
+            tty.setraw(sys.stdin.fileno())
+
     def operate(self, key: str):
         item = self.selected
-        if key == ".":
+        if key == "." :
             self.hidden = not self.hidden
             self.refresh()
         elif key == "/":
@@ -130,6 +157,8 @@ class Explorer:
             self.refresh()
         elif key == "p":
             self.preview = not self.preview
+        elif key == "o" and item and item.is_file() and not item.is_symlink():
+            self.open_editor(item)
         elif key == "n":
             name = self.prompt("New directory name").strip()
             if name:
@@ -161,7 +190,7 @@ class Explorer:
                 elif item.is_symlink():
                     self.message = "Refusing to copy/move a symlink."
                 elif key == "c":
-                    shutil.copytree(item, dest) if item.is_dir() else shutil.copy2(item, dest)
+                    shutil.copytree(item, dest, symlinks=True) if item.is_dir() else shutil.copy2(item, dest)
                     self.message = f"Copied {item.name}"
                 else:
                     shutil.move(str(item), str(dest))
