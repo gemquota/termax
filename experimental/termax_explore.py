@@ -2,7 +2,7 @@
 """Experimental, dependency-free TERMAX visual filesystem navigator.
 
 Keys: arrows/jk move, Enter open, Backspace go up, / filter, . hidden,
-p preview, n new folder, r rename, c copy, m move, d send to trash, q quit.
+p preview, o editor, n new folder, r rename, c copy, m move, d send to trash, q quit.
 Destructive deletion is deliberately replaced with a reversible trash move.
 """
 from __future__ import annotations
@@ -200,10 +200,15 @@ class Explorer:
             answer = self.prompt(f"Move {item.name} to TERMAX trash? [y/N]").strip().lower()
             if answer == "y":
                 trash = Path.home() / ".local/share/Trash/files"
+                if trash.is_symlink():
+                    self.message = "Refusing symlinked trash directory."
+                    return
                 trash.mkdir(parents=True, exist_ok=True)
                 dest = trash / item.name
-                if dest.exists():
-                    dest = trash / f"{item.name}.tx-{os.getpid()}"
+                suffix = 0
+                while dest.exists():
+                    suffix += 1
+                    dest = trash / f"{item.name}.tx-{os.getpid()}-{suffix}"
                 shutil.move(str(item), str(dest))
                 self.message = f"Moved to trash: {dest}"
                 self.refresh()
