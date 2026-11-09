@@ -52,3 +52,48 @@ Attach the generated source archive so the missing modules can be recovered exac
 The current scout inventory records Android 16 ARM64, Termux 0.118.3, Python 3.14.10, Zsh 5.9.2, Git 2.56.0 and Zellij. Zellij is the preferred multiplexer. Powerlevel10k is the active prompt; Starship is an alternative and should not be loaded alongside it.
 
 Optional components must remain optional. In particular, do not install tmux, Textual, Termux:API or Termux:GUI merely because they appear in a roadmap. Verify compatibility and companion-app provenance first.
+
+
+## 0.1.2 expansion track: shell + visual sidecars
+
+The expansion work is being developed separately from the 0.1.1 maintenance rebuild.
+
+### Modular Zsh productivity layer
+
+The optional `shell/termax.zsh` adds Python shortcuts (`py`, `py3`, `pyr`, `pym`, `pyv`, `activate`), directory helpers, Git shortcuts, project helpers and optional integrations for eza, zoxide, fzf, bat and lazygit.
+
+Preview it before sourcing. To try it in a cloned checkout:
+
+~~~zsh
+source ~/termax/shell/termax.zsh
+~~~
+
+It does not edit or replace `~/.zshrc`. Add that source line manually only after reviewing the file. Powerlevel10k remains the active prompt; this layer does not load Starship.
+
+### Experimental visual tools
+
+- `python experimental/termax_explore.py [directory]`: keyboard-driven filesystem explorer with filtering, hidden files, preview, create, rename, copy, move and reversible trash. It uses the Python standard library and does not permanently delete selected files.
+- `python experimental/termax_pulse.py -- python -m unittest discover -s tests -v`: streams a non-interactive command's output and adds a reactive activity waveform.
+- Add `--aquarium` to Pulse for a small ASCII reef whose state responds to output: errors disturb it, warnings create currents, and successful output helps it recover.
+
+The explorer and pulse tools are prototypes, not yet wired into the installed `tx` command dispatcher. The Zsh layer provides `txe` and `txp` wrappers when the checkout is at `~/termax` or the sidecars are installed under `~/.local/share/termax/experimental`.
+
+### Existing project reuse
+
+The expansion research identified useful local projects:
+- `gemquota/nexus-aquarium`: fixed-step simulation, behavioural systems and live telemetry. Its architecture is a strong candidate for a richer terminal aquarium renderer.
+- `gemquota/aiscii`: ASCII video conversion and streaming progress. Its full media pipeline depends on FFmpeg and heavier backend services, so it should remain an optional bridge rather than a Termux core dependency.
+- `gemquota/hydra`: visual experiments and generated assets that may inform future terminal themes and visual modes.
+- `gemquota/golf`: existing Python CLI and interactive-dashboard patterns.
+
+No public or connected repository under the exact `DayneK` account was discoverable in the linked GitHub context. The dotfiles repo may use another owner or repository name.
+
+### Try the experimental sidecars
+
+~~~bash
+python experimental/termax_explore.py ~
+python experimental/termax_pulse.py --aquarium -- python -m unittest discover -s tests -v
+python -m unittest discover -s tests -v
+~~~
+
+These experiments do not install dependencies or alter the live Termux setup. They must pass automated and device-side tests before being promoted into the `tx` command surface.
