@@ -37,6 +37,8 @@ def waveform(seed: int, width: int) -> str:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="TERMAX reactive terminal output visualizer")
+    parser.add_argument("--aquarium", action="store_true",
+                        help="show a reactive ASCII reef whose state responds to output")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="command to execute after --")
     args = parser.parse_args(argv)
     command = args.command
@@ -45,6 +47,13 @@ def main(argv=None):
     if not command:
         parser.error("provide a command, e.g. tx pulse -- python -m unittest")
     interactive = sys.stdout.isatty()
+    reef = None
+    if args.aquarium:
+        try:
+            from termax_aquarium import Aquarium
+            reef = Aquarium()
+        except ImportError:
+            print("Aquarium sidecar unavailable; using waveform mode.", file=sys.stderr)
     started = time.monotonic()
     count = 0
     errors = 0
@@ -61,12 +70,15 @@ def main(argv=None):
             kind = classify(line)
             count += 1
             errors += kind == "bad"
-            # Preserve command output exactly; the visual layer is an additional signal.
+            # Preserve command output; the visual layer is an additional signal.
             print(raw, end="", flush=True)
             if interactive:
-                width = shutil.get_terminal_size((80, 24)).columns - 18
-                color = COLORS[kind]
-                print(f"{color}  ◉ {kind.upper():4} {waveform(count + len(line), width)}{RESET}", flush=True)
+                if reef is not None:
+                    print(reef.render(kind), flush=True)
+                else:
+                    width = shutil.get_terminal_size((80, 24)).columns - 18
+                    color = COLORS[kind]
+                    print(f"{color}  ◉ {kind.upper():4} {waveform(count + len(line), width)}{RESET}", flush=True)
         code = proc.wait()
     except KeyboardInterrupt:
         proc.terminate()
