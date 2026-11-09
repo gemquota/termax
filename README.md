@@ -41,7 +41,7 @@ Run the export utility on the Termux device where 0.1.0 is installed:
 python tools/export-installed-core.py
 ~~~
 
-It creates termax-core-0.1.0-source.tar.gz in shared storage when available, otherwise in the home directory. The export contains the TERMAX application directory, excludes Python caches and backup archives, skips symlinks and common credential filenames, and prints a SHA-256 digest.
+It creates termax-core-0.1.0-source.tar.gz in shared storage when available, otherwise in the home directory. The export contains the TERMAX application directory, excludes Python caches and backup archives, skips symlinks and common credential filenames, and prints a SHA-256 digest. It refuses to overwrite an existing archive; use a different output path or pass --force only when replacement is intentional.
 
 Review the archive before sharing it. Do not publish .dotfiles.md, GitHub authentication files, shell history, private keys, tokens or unrelated home-directory contents. The broad dotfiles acquisition archive is not a substitute for the TERMAX application source.
 
