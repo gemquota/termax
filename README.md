@@ -60,7 +60,7 @@ The expansion work is being developed separately from the 0.1.1 maintenance rebu
 
 ### Modular Zsh productivity layer
 
-The optional `shell/termax.zsh` adds Python shortcuts (`py`, `py3`, `pyr`, `pym`, `pyv`, `activate`, `pyc`, `pyd`, `pyi`), Node/npm shortcuts, directory helpers, Git shortcuts, process/filesystem helpers and optional integrations for eza, zoxide, fzf, bat and lazygit.
+The optional `shell/termax.zsh` adds Python shortcuts (`py`, `py3`, `pyr`, `pym`, `pyv`, `activate`, `pi`, `pir`, `pireq`, `pifreeze`, `pki`, `pks`, `pkup`, `pyc`, `pyd`, `pyi`), Node/npm shortcuts, directory helpers, Git shortcuts, process/filesystem helpers and optional integrations for eza, zoxide, fzf, bat and lazygit.
 
 Preview it before sourcing. To try it in a cloned checkout:
 
@@ -72,7 +72,7 @@ It does not edit or replace `~/.zshrc`. Add that source line manually only after
 
 ### Experimental visual tools
 
-- `python experimental/termax_explore.py [directory]`: keyboard-driven filesystem explorer with filtering, hidden files, text/image previews (bat/chafa when available), editor handoff, create, rename, copy, move and reversible trash. It uses the Python standard library and does not permanently delete selected files.
+- `python experimental/termax_explore.py [--sixel] [directory]`: keyboard-driven filesystem explorer with filtering, hidden files, text previews and opt-in DEC SIXEL image previews (Chafa/libsixel when available), editor handoff, create, rename, copy, move and reversible trash. It uses the Python standard library and does not permanently delete selected files. SIXEL mode requires a SIXEL-capable terminal and is deliberately opt-in.
 - `python experimental/termax_pulse.py -- python -m unittest discover -s tests -v`: streams a non-interactive command's output and adds a reactive activity waveform.
 - Add `--aquarium` to Pulse for a small ASCII reef whose state responds to output: errors disturb it, warnings create currents, and successful output helps it recover.
 
