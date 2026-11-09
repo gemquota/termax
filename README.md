@@ -1,53 +1,54 @@
 # TERMAX Core
 
-A Termux-first terminal workstation bootstrap. Python 3.11+, Zsh, optional Zellij/Rich.
+A Termux-first terminal workstation project. The known-working device baseline is TERMAX Core **0.1.0**. The repository's **0.1.1** maintenance rebuild is currently in source-recovery and installer-safety work.
 
 ## Version roadmap
 
-- **0.1.0**: original TERMAX core baseline.
-- **0.1.1**: current repository rebuild and maintenance release.
-- **0.1.2**: next planned development release, carrying the workspace and shell expansion previously labelled 0.2.0.
+- **0.1.0**: original TERMAX core baseline, installed and verified on the target Termux device.
+- **0.1.1**: maintenance rebuild. Preserve the 0.1.0 command/configuration contracts, recover the complete source, and validate a staged upgrade before enabling installation.
+- **0.1.2**: planned shell, workspace, visual and Android integration expansion.
 
-## Fresh install
+## Current safety status
 
-```bash
+**Do not apply the installer yet.** The repository does not contain the complete installed 0.1.0 application source. The installer now refuses apply requests and preview mode is read-only.
+
+The installed 0.1.0 command surface includes:
+
+- doctor, status, dashboard
+- workspace
+- plugin, config
+- nexus-legacy
+- backup, restore
+
+Its modular implementation includes termax/registry.py, termax/backup.py, termax/system.py, command modules, JSON registries and the preserved NEXUS dashboard. The 0.1.1 repository must retain these interfaces and files rather than replacing them with a reduced CLI.
+
+## Inspect the repository safely
+
+~~~bash
 git clone https://github.com/gemquota/termax.git
 cd termax
-python install.py                 # preview only
-python install.py --apply         # install core
-export PATH="$HOME/.local/bin:$PATH"
-tx doctor
-tx status
-tx dashboard
-tx workspace layouts
-```
+python install.py
+python -m unittest discover -s tests -v
+~~~
 
-To append the optional Zsh aliases/functions source block, use `python install.py --apply --integrate-shell` instead of the plain `--apply` command. Do not run both install commands back-to-back.
+The installer preview performs no writes. Apply currently exits with status 2 and explains why it refused.
 
-## Update an existing clone
+## Recover the installed 0.1.0 source
 
-```bash
-cd ~/termax
-git fetch origin
-git checkout -B main origin/main
-python install.py                 # preview
-python install.py --apply         # install after reviewing preview
-export PATH="$HOME/.local/bin:$PATH"
-tx doctor
-tx status
-tx dashboard
-```
+Run the export utility on the Termux device where 0.1.0 is installed:
 
-Add `--integrate-shell` to the apply command only if you want TERMAX's optional Zsh integration. The installer backs up existing TERMAX app/launcher destinations before replacing them. It does not install packages. It does not edit shell startup files unless integration is explicitly requested.
+~~~bash
+python tools/export-installed-core.py
+~~~
 
-## Workspace
+It creates termax-core-0.1.0-source.tar.gz in shared storage when available, otherwise in the home directory. The export contains the TERMAX application directory, excludes Python caches and backup archives, skips symlinks and common credential filenames, and prints a SHA-256 digest.
 
-`tx workspace layouts` lists bundled Zellij layouts. `tx workspace start default` or `tx workspace start dev` launches Zellij with the selected layout.
+Review the archive before sharing it. Do not publish .dotfiles.md, GitHub authentication files, shell history, private keys, tokens or unrelated home-directory contents. The broad dotfiles acquisition archive is not a substitute for the TERMAX application source.
 
-## Safety and scope
+Attach the generated source archive so the missing modules can be recovered exactly. The next rebuild step is to compare and test the complete source tree, then implement a staged installer that preserves user configuration and can roll back safely.
 
-- Default installer mode is a preview.
-- No package manager commands or network calls are run by the installer.
-- Shell integration is opt-in and appends a marked block to `~/.zshrc`, preserving existing content.
-- Existing app and launcher destinations are timestamp-backed up before replacement.
-- This repository contains the `0.1.1` source rebuild. It is **not** a byte-for-byte reproduction of the earlier locally generated v0.1.0 archive, and this repository build has not yet been device-tested. Keep your existing working installation until you have reviewed and tested this rebuild.
+## Device compatibility notes
+
+The current scout inventory records Android 16 ARM64, Termux 0.118.3, Python 3.14.10, Zsh 5.9.2, Git 2.56.0 and Zellij. Zellij is the preferred multiplexer. Powerlevel10k is the active prompt; Starship is an alternative and should not be loaded alongside it.
+
+Optional components must remain optional. In particular, do not install tmux, Textual, Termux:API or Termux:GUI merely because they appear in a roadmap. Verify compatibility and companion-app provenance first.
