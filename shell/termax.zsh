@@ -6,11 +6,17 @@ alias py='python'
 alias py3='python3'
 alias pipu='python -m pip install --upgrade'
 alias pipls='python -m pip list'
+alias pi='python -m pip install'
+alias pu='python -m pip uninstall'
+alias pishow='python -m pip show'
+alias pifreeze='python -m pip freeze'
+pir() { command python -m pip install -r "${1:-requirements.txt}"; }
+pireq() { command python -m pip freeze > "${1:-requirements.txt}"; }
 pyr() { command python run.py "$@"; }
 pym() { command python main.py "$@"; }
-pyv() { command python -m venv "\${1:-.venv}"; }
+pyv() { command python -m venv "${1:-.venv}"; }
 activate() {
-  local v="\${1:-.venv}"
+  local v="${1:-.venv}"
   [[ -f "$v/bin/activate" ]] || { print -u2 "No venv activation script: $v/bin/activate"; return 1; }
   source "$v/bin/activate"
 }
@@ -30,13 +36,13 @@ alias la='ls -A'
 alias lsd='ls -d */'
 alias mkdir='mkdir -p'
 mkcd() { [[ -n "$1" ]] || return 2; command mkdir -p -- "$1" && builtin cd -- "$1"; }
-up() { local n="\${1:-1}"; while (( n-- > 0 )); do builtin cd .. || return; done; }
+up() { local n="${1:-1}"; while (( n-- > 0 )); do builtin cd .. || return; done; }
 take() { [[ -n "$1" ]] || return 2; command mkdir -p -- "$1" && builtin cd -- "$1"; }
 croot() { local root; root="$(git rev-parse --show-toplevel 2>/dev/null)" || return; builtin cd "$root"; }
 
 # Python project helpers
 pywhere() { command -v python; python --version; }
-pyreq() { python -m pip freeze > "\${1:-requirements.txt}"; }
+pyreq() { python -m pip freeze > "${1:-requirements.txt}"; }
 pyserve() { python -m http.server "\${1:-8000}"; }
 
 # Git shortcuts, intentionally avoiding destructive force/reset aliases.
@@ -82,6 +88,15 @@ alias pyc='python -m compileall -q .'
 alias pytest='python -m pytest'
 alias pipup='python -m pip install --upgrade pip'
 alias pipout='python -m pip freeze'
+
+# Termux package manager shortcuts
+alias pki='pkg install'
+alias pkui='pkg uninstall'
+alias pks='pkg search'
+alias pkl='pkg list-installed'
+alias pkup='pkg update && pkg upgrade'
+alias pkclean='pkg clean'
+alias pkinfo='pkg show'
 
 # Node/npm shortcuts (only meaningful in projects that use Node)
 alias ni='npm install'
