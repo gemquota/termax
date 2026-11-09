@@ -43,7 +43,7 @@ croot() { local root; root="$(git rev-parse --show-toplevel 2>/dev/null)" || ret
 # Python project helpers
 pywhere() { command -v python; python --version; }
 pyreq() { python -m pip freeze > "${1:-requirements.txt}"; }
-pyserve() { python -m http.server "\${1:-8000}"; }
+pyserve() { python -m http.server "${1:-8000}"; }
 
 # Git shortcuts, intentionally avoiding destructive force/reset aliases.
 alias g='git'
@@ -135,6 +135,10 @@ txp() {
   command python "$root/experimental/termax_pulse.py" "$@"
 }
 alias txv='tx dashboard'
+
+# SIXEL is opt-in: only enable it after confirming the terminal supports it.
+alias sixelon='export TERMAX_SIXEL=1'
+alias sixeloff='unset TERMAX_SIXEL'
 
 # Small conveniences
 alias ports='ss -tulpen 2>/dev/null || netstat -tulpen 2>/dev/null'
