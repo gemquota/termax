@@ -4,12 +4,12 @@ from __future__ import annotations
 import argparse, os, platform, shutil, subprocess, sys, time
 from pathlib import Path
 
-VERSION = "0.1.01"
+VERSION = "0.1.1"
 APP_REL = Path(".local/share/termax")
 CLI = r'''from __future__ import annotations
 import argparse, os, platform, shutil, sys
 from pathlib import Path
-VERSION = "0.1.01"
+VERSION = "0.1.1"
 def has(n): return shutil.which(n) is not None
 def doctor(_):
  print("TERMAX DOCTOR")
@@ -106,7 +106,7 @@ def main():
   if b:print("Backed up:",b)
  (app/"termax").mkdir(parents=True,exist_ok=True)
  (app/"config/zellij/layouts").mkdir(parents=True,exist_ok=True)
- (app/"termax/__init__.py").write_text('__version__ = "0.1.01"\n',encoding="utf-8")
+ (app/"termax/__init__.py").write_text('__version__ = "0.1.1"\n',encoding="utf-8")
  (app/"termax/cli.py").write_text(CLI,encoding="utf-8")
  (app/"shell").mkdir(exist_ok=True)
  (app/"shell/termax.zsh").write_text(SHELL,encoding="utf-8")
