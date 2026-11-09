@@ -2,6 +2,14 @@
 
 A Termux-first terminal workstation bootstrap. Python 3.11+, Zsh, optional Zellij/Rich.
 
+## Versioning
+
+TERMAX uses zero-padded patch labels rather than strict Semantic Versioning:
+- `0.1.01`: current baseline release.
+- `0.1.10`: planned next development release, replacing the earlier `0.2.0) label.
+
+The leading zero in `0.1.01` is intentional for TERMAX's display/version convention; it is not a valid strict SemVer version.
+
 ## Fresh install
 
 ```bash
@@ -44,4 +52,4 @@ Add `--integrate-shell` to the apply command only if you want TERMAX's optional 
 - No package manager commands or network calls are run by the installer.
 - Shell integration is opt-in and appends a marked block to `~/.zshrc`, preserving existing content.
 - Existing app and launcher destinations are timestamp-backed up before replacement.
-- This repository currently contains a clean 0.1.1 source rebuild. It is **not** a byte-for-byte reproduction of the earlier locally generated v0.1 archive, and this repository build has not yet been device-tested. Keep your existing working installation until you have reviewed and tested this rebuild.
+- This repository contains the `0.1.01` source rebuild. It is **not** a byte-for-byte reproduction of the earlier locally generated v0.1 archive, and this repository build has not yet been device-tested. Keep your existing working installation until you have reviewed and tested this rebuild.
