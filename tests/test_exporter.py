@@ -58,6 +58,16 @@ class ExporterTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 EXPORTER.export(source, root / "out.tar.gz")
 
+    def test_export_does_not_overwrite_existing_archive_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = self.make_source(root)
+            output = root / "out.tar.gz"
+            output.write_bytes(b"keep this")
+            with self.assertRaises(FileExistsError):
+                EXPORTER.export(source, output)
+            self.assertEqual(output.read_bytes(), b"keep this")
+
 
 if __name__ == "__main__":
     unittest.main()
