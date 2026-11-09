@@ -75,6 +75,35 @@ if (( $+commands[fzf] )); then
 fi
 if (( $+commands[lazygit] )); then alias lg='lazygit'; fi
 
+# Python quality-of-life
+alias pyd='python -m pdb'
+alias pyi='python -i'
+alias pyc='python -m compileall -q .'
+alias pytest='python -m pytest'
+alias pipup='python -m pip install --upgrade pip'
+alias pipout='python -m pip freeze'
+
+# Node/npm shortcuts (only meaningful in projects that use Node)
+alias ni='npm install'
+alias nid='npm install --save-dev'
+alias nr='npm run'
+alias nrd='npm run dev'
+alias nrb='npm run build'
+alias nrt='npm test'
+alias npxc='npx'
+
+# Filesystem and process helpers
+alias dus='du -sh ./* 2>/dev/null | sort -h'
+alias du1='du -h --max-depth=1 . 2>/dev/null | sort -h'
+alias dfh='df -h'
+alias psg='ps -ef | grep -i'
+alias tree2='tree -L 2'
+alias tree3='tree -L 3'
+alias jfmt='python -m json.tool'
+alias gss='git status --short'
+alias glog='git log --graph --oneline --decorate -20'
+alias gshow='git show --stat'
+
 # TERMAX entry points
 alias txs='tx status'
 alias txd='tx doctor'
