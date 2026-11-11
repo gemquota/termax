@@ -30,3 +30,5 @@ class Release029Tests(unittest.TestCase):
    r=Path(d); src=r/"folder"; src.mkdir(); dst=src/"inside"; dst.mkdir()
    with self.assertRaises(ValueError): transfer([src],dst)
 if __name__=="__main__": unittest.main()
+
+# CI exercises this module on each supported Python version.
