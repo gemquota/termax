@@ -9,6 +9,7 @@ def main(argv=None):
     for c in COMMANDS:
         q=sub.add_parser(c.name,help=c.summary)
         if c.name=="nexus-legacy": q.add_argument("extra",nargs=argparse.REMAINDER)
+        if c.name=="ask": q.add_argument("prompt",nargs=argparse.REMAINDER,help="prompt to send to Gemini through WW")
         if c.name=="plugin": q.add_argument("action",choices=("list",),nargs="?",default="list")
         if c.name=="config": q.add_argument("action",choices=("show",),nargs="?",default="show")
         q.set_defaults(module=c.module,function=c.function)
