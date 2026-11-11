@@ -9,7 +9,7 @@ def main(argv=None):
     p.add_argument("--apply",action="store_true"); a=p.parse_args(argv)
     print("TERMAX installer 0.2.9"); print("Application:",APP); print("Launchers:",BIN/"termax",BIN/"tx")
     if not a.apply: print("DRY RUN: no files changed. Re-run with --apply."); return 0
-    required=("termax/__init__.py","termax/cli.py","termax/registry.py","termax/backup.py","termax/browser.py","termax/system.py","config/plugins.json","config/aliases.json","config/functions.json")
+    required=("termax/__init__.py","termax/cli.py","termax/registry.py","termax/backup.py","termax/browser.py","termax/system.py","termax/commands/ww.py","config/plugins.json","config/aliases.json","config/functions.json")
     missing=[x for x in required if not (SRC/x).is_file()]
     if missing:
         print("REFUSED: incomplete source tree:",", ".join(missing),file=sys.stderr); return 2
