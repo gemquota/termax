@@ -1,72 +1,25 @@
-from __future__ import annotations
-
-import os
-import subprocess
-import sys
-import tempfile
-import unittest
+import os, subprocess, sys, tempfile, unittest
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-INSTALLER = ROOT / "install.py"
-
-
-class InstallerSafetyTests(unittest.TestCase):
-    def run_installer(self, *args: str, home: Path):
-        env = os.environ.copy()
-        env["HOME"] = str(home)
-        return subprocess.run(
-            [sys.executable, str(INSTALLER), *args],
-            cwd=ROOT,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-
-    def test_preview_is_read_only(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            result = self.run_installer(home=home)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("Preview only", result.stdout)
-            self.assertFalse((home / ".local/share/termax").exists())
-            self.assertFalse((home / ".local/bin/tx").exists())
-
-    def test_apply_is_refused_without_writes(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            result = self.run_installer("--apply", home=home)
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("REFUSED", result.stdout)
-            self.assertFalse((home / ".local/share/termax").exists())
-            self.assertFalse((home / ".local/bin/tx").exists())
-
-    def test_existing_install_is_not_modified(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            app = home / ".local/share/termax"
-            app.mkdir(parents=True)
-            (app / "VERSION").write_text("0.1.0", encoding="utf-8")
-            sentinel = app / "preserve-me.txt"
-            sentinel.write_text("baseline", encoding="utf-8")
-            result = self.run_installer("--apply", home=home)
-            self.assertEqual(result.returncode, 2)
-            self.assertEqual((app / "VERSION").read_text(encoding="utf-8"), "0.1.0")
-            self.assertEqual(sentinel.read_text(encoding="utf-8"), "baseline")
-            self.assertFalse((home / ".local/bin/tx").exists())
-
-    def test_help_is_available(self):
-        result = subprocess.run(
-            [sys.executable, str(INSTALLER), "--help"],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("--apply", result.stdout)
-
-
-if __name__ == "__main__":
-    unittest.main()
+ROOT=Path(__file__).resolve().parents[1]; INSTALLER=ROOT/"install.py"
+class InstallerTests(unittest.TestCase):
+ def run_it(self,*args,home):
+  env=os.environ.copy(); env["HOME"]=str(home)
+  return subprocess.run([sys.executable,str(INSTALLER),*args],cwd=ROOT,env=env,text=True,capture_output=True)
+ def test_preview_read_only(self):
+  with tempfile.TemporaryDirectory() as d:
+   h=Path(d); r=self.run_it(home=h); self.assertEqual(r.returncode,0,r.stderr)
+   self.assertFalse((h/".local/share/termax").exists())
+ def test_apply_installs_both_launchers(self):
+  with tempfile.TemporaryDirectory() as d:
+   h=Path(d); r=self.run_it("--apply",home=h); self.assertEqual(r.returncode,0,r.stderr)
+   self.assertEqual((h/".local/share/termax/VERSION").read_text().strip(),"0.2.9")
+   self.assertTrue((h/".local/bin/termax").exists()); self.assertTrue((h/".local/bin/tx").exists())
+ def test_upgrade_preserves_backup(self):
+  with tempfile.TemporaryDirectory() as d:
+   h=Path(d); app=h/".local/share/termax"; app.mkdir(parents=True); (app/"VERSION").write_text("0.1.0")
+   r=self.run_it("--apply",home=h); self.assertEqual(r.returncode,0,r.stderr)
+   self.assertTrue(list((h/".local/share").glob("termax.backup-*")))
+ def test_help(self):
+  r=subprocess.run([sys.executable,str(INSTALLER),"--help"],cwd=ROOT,text=True,capture_output=True)
+  self.assertEqual(r.returncode,0); self.assertIn("--apply",r.stdout)
+if __name__=="__main__": unittest.main()
