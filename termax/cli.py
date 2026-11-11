@@ -14,6 +14,10 @@ def main(argv=None):
         q.set_defaults(module=c.module,function=c.function)
     b=sub.add_parser("browse",help="interactive file browser"); b.add_argument("path",nargs="?",default=".")
     l=sub.add_parser("ls",help="list files"); l.add_argument("path",nargs="?",default="."); l.add_argument("--thumbnails",action="store_true")
+    g=sub.add_parser("graphics",help="Termux graphics diagnostics and Sixel test")
+    gs=g.add_subparsers(dest="graphics_action",required=True)
+    gs.add_parser("doctor",help="inspect Sixel encoder and terminal verification")
+    gs.add_parser("demo",help="emit a Sixel test pattern")
     from termax.backup import add_subcommands
     add_subcommands(sub)
     a=p.parse_args(argv)
@@ -24,6 +28,15 @@ def main(argv=None):
     if a.command=="ls":
         from termax.browser import list_files
         list_files(a.path,a.thumbnails); return 0
+    if a.command=="graphics":
+        from termax.graphics import probe, demo
+        if a.graphics_action=="demo":
+            demo()
+            return 0
+        status=probe()
+        for key,value in status.items():
+            print(f"{key}: {value}")
+        return 0 if status["encoder"] else 1
     if hasattr(a,"handler"): return a.handler(a)
     return getattr(importlib.import_module(a.module),a.function)(a)
 if __name__=="__main__": raise SystemExit(main())
