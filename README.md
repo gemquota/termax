@@ -1,6 +1,6 @@
 # TERMAX 0.2.9
 
-Termux-first terminal command centre. This release restores the modular core supplied in the TERMAX Core v0.1 source archive and adds a full-screen terminal file navigator, safe session clipboard operations and optional Chafa Sixel previews.
+Termux-first terminal command centre. TERMAX targets Android/Termux and treats Sixel as a native graphics backend, with Termux:Monet as the preferred terminal emulator.
 
 ## Install on Termux
 
@@ -18,14 +18,44 @@ termax doctor
 
 The first installer run is a read-only preview. The second explicitly applies the install. It stages the application under `~/.local/share/termax`, keeps a timestamped backup of an existing installation, and creates `termax` and `tx` launchers under `~/.local/bin`. It does not edit shell startup files.
 
-## Update
+## Preferred terminal: Termux:Monet
+
+TERMAX is designed around the Sixel-capable Termux:Monet terminal experience. The Monet codebase documents Sixel and iTerm2 image protocols, and its terminal emulator contains a Sixel parser, bitmap storage and bitmap renderer. The HiFIi source fork inspected for this integration includes that implementation:
+
+- Source: https://github.com/HiFIi/termux-monet
+- Original Monet project: https://github.com/Termux-Monet/termux-monet
+
+The original Termux-Monet project is archived, and the inspected HiFIi fork has not received a code push since June 2024. Treat APKs from unofficial forks as experimental. TERMAX does not silently install or replace your terminal emulator.
+
+## Sixel setup and verification
+
+Install an encoder inside Termux:
 
 ```sh
-cd ~/termax
-git pull --ff-only
-python install.py
-python install.py --apply
+pkg install chafa
+# or: pkg install libsixel
 ```
+
+Then run:
+
+```sh
+termax graphics doctor
+termax graphics demo
+```
+
+The demo emits a small Sixel test pattern. If it visibly renders in your terminal, enable Sixel output for TERMAX:
+
+```sh
+export TERMAX_SIXEL=1
+```
+
+To disable it:
+
+```sh
+export TERMAX_SIXEL=0
+```
+
+TERMAX deliberately does not infer Sixel support from `TERM=xterm-256color`, truecolour, the presence of Chafa, or the presence of libsixel. Those prove neither that the terminal parser is enabled nor that it can display the output.
 
 ## File browser
 
@@ -36,7 +66,7 @@ termax ls ~/storage/shared --thumbnails
 
 Keys: arrows or j/k move; Enter opens; Backspace or b goes back; f forward; u up; c copy; x mark for move; p paste; v preview; q quit. Mouse click selects and double-click enters directories where the terminal emulator forwards mouse events. Existing destinations are never overwritten. Symlink transfers are refused, and directory self-transfers are blocked.
 
-Chafa is optional. If installed, image previews are emitted as Sixel data. Sixel support is terminal-emulator-dependent and is not inferred from TERM or COLORTERM. If the emulator does not support Sixel, use the regular file list or disable thumbnails.
+Sixel previews require a verified Sixel-capable terminal and an installed encoder. The regular file list remains available without either.
 
 ## Other commands
 
@@ -48,4 +78,4 @@ Chafa is optional. If installed, image previews are emitted as Sixel data. Sixel
 python -m unittest discover -s tests -v
 ```
 
-The test suite covers CLI parsing, backup allowlisting, symlink-parent rejection, safe copy/move, collisions and directory self-transfer. Sixel rendering and Android mouse forwarding require testing in the target terminal emulator.
+The test suite covers CLI parsing, backup allowlisting, symlink-parent rejection, safe copy/move, collisions and directory self-transfer. Sixel display still needs visual verification in the actual Android terminal emulator.
