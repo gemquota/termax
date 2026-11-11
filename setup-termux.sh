@@ -50,6 +50,9 @@ if ! python -m pip install -r "$PY_FILE"; then
 fi
 
 echo
+HAD_ZSHRC=0
+[[ -f "$HOME/.zshrc" ]] && HAD_ZSHRC=1
+
 echo "Installing Oh My Zsh..."
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
   RUNZSH=no CHSH=no KEEP_ZSHRC=yes     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
@@ -58,9 +61,6 @@ if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
 else
   echo "Oh My Zsh already exists; leaving it in place."
 fi
-
-HAD_ZSHRC=0
-[[ -f "$HOME/.zshrc" ]] && HAD_ZSHRC=1
 
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 mkdir -p "$ZSH_CUSTOM/plugins" "$ZSH_CUSTOM/themes"
