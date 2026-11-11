@@ -20,12 +20,9 @@ The first installer run is a read-only preview. The second explicitly applies th
 
 ## Preferred terminal: Termux:Monet
 
-TERMAX is designed around the Sixel-capable Termux:Monet terminal experience. The Monet codebase documents Sixel and iTerm2 image protocols, and its terminal emulator contains a Sixel parser, bitmap storage and bitmap renderer. The HiFIi source fork inspected for this integration includes that implementation:
+TERMAX is designed around the Sixel-capable Termux:Monet terminal experience. The newest accessible unarchived Monet fork found during this integration is https://github.com/JingMatrix/termux-monet (latest code push inspected: 28 August 2024). Its README documents Sixel and iTerm2 image protocols, and its terminal emulator source contains Sixel parsing, bitmap storage and Android canvas rendering.
 
-- Source: https://github.com/HiFIi/termux-monet
-- Original Monet project: https://github.com/Termux-Monet/termux-monet
-
-The original Termux-Monet project is archived, and the inspected HiFIi fork has not received a code push since June 2024. Treat APKs from unofficial forks as experimental. TERMAX does not silently install or replace your terminal emulator.
+The original Termux-Monet project is archived. Fork activity is limited, so treat unofficial APKs as experimental and verify their signatures and provenance. TERMAX does not silently install or replace your terminal emulator.
 
 ## Sixel setup and verification
 
