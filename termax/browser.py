@@ -1,6 +1,7 @@
-"""Termux file browser. Uses stdlib curses and optional Chafa Sixel output."""
-import curses, os, shutil, stat, subprocess
+"""Termux file browser. Uses the shared TERMAX Sixel graphics backend."""
+import curses, os, shutil, stat
 from pathlib import Path
+from termax.graphics import display as display_sixel
 IMAGE={".png",".jpg",".jpeg",".gif",".webp",".bmp",".tif",".tiff",".avif"}
 def entries(path):
     rows=[]
@@ -29,13 +30,13 @@ def transfer(sources,destination,move=False):
         done.append(target)
     return done
 def preview(path):
-    chafa=shutil.which("chafa")
-    if not chafa: return "Chafa is not installed (optional)."
     try:
-        r=subprocess.run([chafa,"--format=sixels","--size","60x20",str(path)],capture_output=True,timeout=5)
-        if r.returncode or not r.stdout: return "Chafa could not render this image."
-        curses.endwin(); os.write(1,r.stdout); input("\\nPreview: press Enter "); return "Preview closed."
-    except (OSError,subprocess.TimeoutExpired): return "Preview failed or timed out."
+        curses.endwin()
+        display_sixel(path,width=60,height=20)
+        input("\nPreview: press Enter ")
+        return "Preview closed."
+    except (OSError,RuntimeError,ValueError) as e:
+        return "Sixel preview unavailable: "+str(e)
 def browse(start="."):
     root=Path(start).expanduser().resolve()
     if not root.is_dir(): raise NotADirectoryError(root)
@@ -55,7 +56,7 @@ def browse(start="."):
                 if p in clip: label=("CUT " if cut else "COPY ")+label
                 try: win.addnstr(i+1,0,label,max(1,w-1),curses.A_REVERSE if i==idx else 0)
                 except curses.error: pass
-            win.addnstr(h-2,0,msg,max(1,w-1)); win.addnstr(h-1,0,"Mouse click select / double-click open. Sixel requires emulator support.",max(1,w-1)); win.refresh()
+            win.addnstr(h-2,0,msg,max(1,w-1)); win.addnstr(h-1,0,"Sixel previews require Termux:Monet (or another Sixel terminal) and TERMAX_SIXEL=1.",max(1,w-1)); win.refresh()
             k=win.getch()
             if k in (ord("q"),27): break
             if k in (curses.KEY_UP,ord("k")): idx=max(0,idx-1)
@@ -87,9 +88,5 @@ def list_files(path=".",thumbnails=False):
     for p,st in entries(Path(path).expanduser()):
         print(("/" if stat.S_ISDIR(st.st_mode) else " ")+f" {st.st_size:>10}  {p.name}")
         if thumbnails and p.suffix.lower() in IMAGE:
-            chafa=shutil.which("chafa")
-            if chafa:
-                try:
-                    r=subprocess.run([chafa,"--format=sixels","--size","16x8",str(p)],capture_output=True,timeout=4)
-                    if r.returncode==0 and r.stdout: os.write(1,r.stdout+b"\\n")
-                except (OSError,subprocess.TimeoutExpired): pass
+            try: display_sixel(p,width=16,height=8)
+            except (OSError,RuntimeError,ValueError): pass
