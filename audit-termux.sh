@@ -10,6 +10,10 @@ fail(){ printf '[MISSING] %s\n' "$1"; ((missing+=1)); }
 echo "========== TERMAX ENVIRONMENT AUDIT =========="
 echo "Termux: ${TERMUX_VERSION:-unknown} | $(uname -m)"
 echo "Shell: $SHELL"
+while read -r package; do
+  [[ -z "$package" || "$package" == \\#* ]] && continue
+  dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed" && pass "Termux package: $package" || fail "Termux package: $package"
+done < "$PKG_FILE"
 for c in zsh git python pip tmux curl wget jq fzf zoxide rg fd bat eza chafa dot gum nvim lazygit starship gh; do
   command -v "$c" >/dev/null 2>&1 && pass "$c" || fail "$c"
 done
