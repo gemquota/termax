@@ -1,0 +1,15 @@
+# Python packages observed in the previous TERMAX environment, plus missing requested dependencies.
+rich
+cloudscraper
+fastapi
+httplib2
+opentelemetry-api
+requests
+requests-toolbelt
+uvicorn
+textual
+prompt_toolkit
+plotext
+networkx
+PyYAML
+typer

@@ -16,7 +16,7 @@ termax --version
 termax doctor
 ```
 
-The first installer run is a read-only preview. The second explicitly applies the install. It stages the application under `~/.local/share/termax`, keeps a timestamped backup of an existing installation, and creates `termax` and `tx` launchers under `~/.local/bin`. It does not edit shell startup files.
+The first installer run is a read-only preview. The second explicitly applies the install. It stages the application under `~/.local/share/termax`, keeps a timestamped backup of an existing installation, and creates `termax` and `tx` launchers under `~/.local/bin`. It does not edit shell startup files.\n\n### Full Termux environment (Zsh, Oh My Zsh, tools and Python)\n\nThe environment bootstrap installs the explicit top-level Termux packages recorded by TERMAX Scout, the recorded and requested Python dependencies, Oh My Zsh, Powerlevel10k, and the archived Zsh plugin set. It preserves an existing `.zshrc` rather than replacing personal configuration. Review `config/termux-packages.txt` and `config/python-requirements.txt` before running.\n\n```sh\ngit pull --ff-only\nbash setup-termux.sh\nbash audit-termux.sh\n```\n\nThe bootstrap logs to `~/termax-bootstrap-*.log`. Package names unavailable in the configured Termux repositories are reported and cause a non-zero exit. `termux-api` also needs the separate Android Termux:API companion app and permissions. The audit checks command availability, Oh My Zsh, Powerlevel10k, plugins, and Python imports.
 
 ## Update
 
