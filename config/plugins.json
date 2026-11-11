@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    {"name":"rich","status":"optional","purpose":"Enhanced terminal rendering"},
+    {"name":"chafa","status":"optional","purpose":"Sixel and terminal image previews"},
+    {"name":"termux-api","status":"optional","purpose":"Android device integration"},
+    {"name":"zellij","status":"preferred","purpose":"Terminal workspace multiplexer"},
+    {"name":"textual","status":"optional","purpose":"Future TUI components"}
+  ]
+}
