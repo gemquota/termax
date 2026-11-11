@@ -1,0 +1,5 @@
+{
+  "mkcd": "Create a directory and enter it.",
+  "extract": "Safely extract an archive into a target directory.",
+  "f": "Fuzzy-find with fzf, or fall back to find."
+}

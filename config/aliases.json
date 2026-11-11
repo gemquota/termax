@@ -1,0 +1,10 @@
+{
+  "ll": "eza -lah --group-directories-first",
+  "la": "eza -la",
+  "g": "git",
+  "gs": "git status --short --branch",
+  "gl": "git log --oneline --decorate -12",
+  "c": "clear",
+  "txs": "tx status",
+  "txd": "tx doctor"
+}
