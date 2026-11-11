@@ -50,6 +50,9 @@ if ! python -m pip install -r "$PY_FILE"; then
 fi
 
 echo
+HAD_ZSHRC=0
+[[ -f "$HOME/.zshrc" ]] && HAD_ZSHRC=1
+
 echo "Installing Oh My Zsh..."
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
   RUNZSH=no CHSH=no KEEP_ZSHRC=yes     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
@@ -76,14 +79,19 @@ clone_plugin https://github.com/marlonrichert/zsh-autocomplete.git "$ZSH_CUSTOM/
 clone_plugin https://github.com/zsh-users/zsh-history-substring-search.git "$ZSH_CUSTOM/plugins/zsh-history-substring-search"
 
 ZRC="$HOME/.zshrc"
-if [[ ! -f "$ZRC" ]]; then
-  cat > "$ZRC" <<'EOF'
-export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME="powerlevel10k/powerlevel10k"
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)
-source "$ZSH/oh-my-zsh.sh"
+if (( HAD_ZSHRC == 0 )); then
+  # Oh My Zsh creates a default .zshrc during its unattended install.
+  # Configure that generated file; never overwrite a pre-existing personal .zshrc.
+  sed -i 's|^[[:space:]]*ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' "$ZRC"
+  sed -i 's|^[[:space:]]*plugins=.*|plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)|' "$ZRC"
+  if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
+    cat >> "$ZRC" <<'EOF'
+
+# TERMAX_MANAGED_ZSH: managed additions.
+export PATH="$HOME/.local/bin:$PATH"
 [[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
 EOF
+  fi
 else
   cp -p "$ZRC" "$ZRC.termax-backup-$(date +%Y%m%d-%H%M%S)"
   if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
