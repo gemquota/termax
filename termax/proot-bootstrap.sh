@@ -250,11 +250,11 @@ if command -v zsh >/dev/null 2>&1 && [[ -f "$HOME/.zshrc" ]]; then
   zsh -n "$HOME/.zshrc" || ZSH_MISSING+=("Debian .zshrc syntax")
 fi
 echo "Final Debian package audit: ${#FINAL_MISSING[@]} missing."
-if (("${#FINAL_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${FINAL_MISSING[*]}"; FAILED+=("Debian final package audit"); fi
+if (("${#FINAL_MISSING[@]}" > 0)); then printf '  still missing: %s\n' "${FINAL_MISSING[*]}"; FAILED+=("Debian final package audit"); fi
 echo "Final Debian Zsh/Python audit: ${#ZSH_MISSING[@]} missing."
-if (("${#ZSH_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${ZSH_MISSING[*]}"; FAILED+=("Debian final Zsh/Python audit"); fi
+if (("${#ZSH_MISSING[@]}" > 0)); then printf '  still missing: %s\n' "${ZSH_MISSING[*]}"; FAILED+=("Debian final Zsh/Python audit"); fi
 if (("${#UNAVAILABLE[@]}" > 0)); then
-  printf '  unavailable packages: %s\\n' "${UNAVAILABLE[*]}"
+  printf '  unavailable packages: %s\n' "${UNAVAILABLE[*]}"
   FAILED+=("Debian manifest contains unavailable packages")
 fi
 if (("${#FAILED[@]}" > 0)); then
