@@ -37,6 +37,17 @@ else
 fi
 
 mapfile -t packages < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$PACKAGE_FILE")
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  minimal=(bash ca-certificates curl git python3 python3-pip python3-venv zsh fzf ripgrep fd-find jq)
+  filtered=()
+  for package in "${packages[@]}"; do
+    for keep in "${minimal[@]}"; do
+      if [[ "$package" == "$keep" ]]; then filtered+=("$package"); break; fi
+    done
+  done
+  packages=("${filtered[@]}")
+  echo "Minimal Debian package profile selected."
+fi
 for package in "${packages[@]}"; do
   if apt-cache show "$package" >/dev/null 2>&1; then
     AVAILABLE+=("$package")
