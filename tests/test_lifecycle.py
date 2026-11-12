@@ -45,7 +45,7 @@ class LifecyclePreflightTests(unittest.TestCase):
                 lifecycle._write_report(["new report"])
             self.assertEqual(default.read_text(encoding="utf-8"), "keep me")
             dated = home / "termax-report-20261112-123456.txt"
-            self.assertEqual(dated.read_text(encoding="utf-8"), "new report\\n")
+            self.assertEqual(dated.read_text(encoding="utf-8"), "new report\n")
 
 if __name__ == "__main__":
     unittest.main()
