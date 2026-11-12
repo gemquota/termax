@@ -12,6 +12,13 @@ from termax.system import probe
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_MANIFEST = ROOT / "config" / "termux-packages.txt"
 PYTHON_MANIFEST = ROOT / "config" / "python-requirements.txt"
+PLUGIN_REPOS = {
+    "themes/powerlevel10k": "https://github.com/romkatv/powerlevel10k.git",
+    "plugins/zsh-autosuggestions": "https://github.com/zsh-users/zsh-autosuggestions.git",
+    "plugins/zsh-syntax-highlighting": "https://github.com/zsh-users/zsh-syntax-highlighting.git",
+    "plugins/zsh-autocomplete": "https://github.com/marlonrichert/zsh-autocomplete.git",
+    "plugins/zsh-history-substring-search": "https://github.com/zsh-users/zsh-history-substring-search.git",
+}
 
 def _manifest(path):
     if not path.is_file():
@@ -65,6 +72,49 @@ def _package_state(package):
     result = subprocess.run(["dpkg-query", "-W", "-f=${Status}", package], capture_output=True, text=True)
     return result.returncode == 0 and "install ok installed" in result.stdout
 
+def _zsh_audit():
+    home = Path.home()
+    custom = Path(os.environ.get("ZSH_CUSTOM", str(home / ".oh-my-zsh/custom")))
+    checks = {
+        "Oh My Zsh": (home / ".oh-my-zsh").is_dir(),
+        ".zshrc": (home / ".zshrc").is_file(),
+        "Powerlevel10k": (custom / "themes/powerlevel10k").is_dir(),
+    }
+    for plugin in ("zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-autocomplete", "zsh-history-substring-search"):
+        checks[plugin] = (custom / "plugins" / plugin).is_dir()
+    return checks
+
+def _repair_zsh(debug, failures):
+    home = Path.home()
+    omz = home / ".oh-my-zsh"
+    if not omz.is_dir():
+        installer = 'RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
+        print("Installing missing Oh My Zsh...")
+        if _run(["sh", "-c", installer], debug):
+            failures.append("Oh My Zsh installation")
+            return
+    custom = Path(os.environ.get("ZSH_CUSTOM", str(omz / "custom")))
+    for relative, url in PLUGIN_REPOS.items():
+        destination = custom / relative
+        if destination.is_dir() and (destination / ".git").is_dir():
+            if _run(["git", "-C", str(destination), "pull", "--ff-only"], debug):
+                failures.append("update " + relative)
+        elif not destination.exists():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if _run(["git", "clone", "--depth=1", url, str(destination)], debug):
+                failures.append("install " + relative)
+        else:
+            print(f"[SKIP] Preserving non-git directory: {destination}")
+    zshrc = home / ".zshrc"
+    if not zshrc.exists():
+        template = omz / "templates/zshrc.zsh-template"
+        if template.is_file():
+            zshrc.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+            with zshrc.open("a", encoding="utf-8") as stream:
+                stream.write("\n# TERMAX_MANAGED_ZSH\nexport PATH=\"$HOME/.local/bin:$PATH\"\n")
+    else:
+        print("Existing .zshrc left untouched.")
+
 def new(args):
     if not _is_termux():
         print("Run tx new from native Termux, not inside Debian proot.", file=sys.stderr)
@@ -86,7 +136,7 @@ def new(args):
         return 0
     script = ROOT / "termax" / "bootstrap.sh"
     if not script.is_file():
-        print("Bootstrap module is missing:", script, file=sys.stderr)
+        print("Internal bootstrap module is missing:", script, file=sys.stderr)
         return 2
     env = os.environ.copy()
     if args.minimal:
@@ -136,12 +186,18 @@ def up(args):
     print("Refreshing declared Python dependencies...")
     if _run([sys.executable, "-m", "pip", "install", "-r", str(PYTHON_MANIFEST)], args.debug):
         failures.append("Python requirements")
+    print("Repairing and updating the managed Zsh tools...")
+    _repair_zsh(args.debug, failures)
     final_missing = [p for p in packages if not _package_state(p)]
+    zsh_checks = _zsh_audit()
+    missing_shell = [name for name, present in zsh_checks.items() if not present]
     lines += [
         "", "MODE: maintenance",
-        "Actions: pkg update, pkg upgrade, install missing manifest packages, pip requirements",
+        "Actions: pkg update, pkg upgrade, install missing packages, Python requirements, Zsh component repair",
         f"Final missing packages: {len(final_missing)}",
         "Final missing: " + (", ".join(final_missing) if final_missing else "none"),
+        f"Missing Zsh components: {len(missing_shell)}",
+        "Missing Zsh components: " + (", ".join(missing_shell) if missing_shell else "none"),
         "Failures: " + (", ".join(failures) if failures else "none"),
         "", "DIAGNOSTICS",
     ]
@@ -149,8 +205,10 @@ def up(args):
         lines.append(f"{name}: {path or 'missing'}")
     for name, present in data["modules"].items():
         lines.append(f"python module {name}: {'present' if present else 'missing'}")
+    for name, present in zsh_checks.items():
+        lines.append(f"{name}: {'present' if present else 'missing'}")
     _write_report(lines)
-    if failures or final_missing:
+    if failures or final_missing or missing_shell:
         print("Maintenance finished with issues. See the report.")
         return 1
     print("Maintenance and final audit complete.")
