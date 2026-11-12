@@ -12,6 +12,7 @@ from termax.system import probe
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_MANIFEST = ROOT / "config" / "termux-packages.txt"
 PYTHON_MANIFEST = ROOT / "config" / "python-requirements.txt"
+DEBIAN_MANIFEST = ROOT / "config" / "debian-packages.txt"
 PLUGIN_REPOS = {
     "themes/powerlevel10k": "https://github.com/romkatv/powerlevel10k.git",
     "plugins/zsh-autosuggestions": "https://github.com/zsh-users/zsh-autosuggestions.git",
@@ -171,12 +172,14 @@ def new(args):
         return 2
     packages = _manifest(PACKAGE_MANIFEST)
     requirements = _manifest(PYTHON_MANIFEST)
+    debian_packages = _manifest(DEBIAN_MANIFEST)
     if args.minimal:
         essentials = {"bash", "ca-certificates", "curl", "git", "python", "python-pip", "proot-distro", "zsh", "zsh-completions", "fzf", "ripgrep", "fd", "jq"}
         packages = [p for p in packages if p in essentials]
     print("TERMAX minimal bootstrap" if args.minimal else "TERMAX full environment bootstrap")
     print(f"Planned Termux packages: {len(packages)}")
-    print(f"Planned Python requirements: {len(requirements)}")
+    print(f"Planned Debian proot packages: {len(debian_packages)}")
+    print(f"Planned Python requirements per environment: {len(requirements)}")
     print("TERMAX manages both native Termux and Debian proot. WW itself remains untouched.")
     if args.check:
         missing = [p for p in packages if not _package_state(p)]
@@ -219,8 +222,9 @@ def up(args):
         f"Shell: {data['shell']}",
         "",
         "PREFLIGHT",
-        f"Manifest packages: {len(packages)}",
-        f"Missing packages: {len(missing)}",
+        f"Native Termux manifest packages: {len(packages)}",
+        f"Debian proot manifest packages: {len(_manifest(DEBIAN_MANIFEST))}",
+        f"Missing native packages: {len(missing)}",
         "Missing: " + (", ".join(missing) if missing else "none"),
         f"Missing Python modules: {len(missing_modules)}",
         "Missing modules: " + (", ".join(missing_modules) if missing_modules else "none"),
