@@ -78,7 +78,11 @@ if [[ "$MODE" == "check" ]]; then
   [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || ZSH_MISSING+=("zsh-history-substring-search")
   [[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
   if [[ -x "$VENV/bin/python" ]]; then
-    modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+    if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+      modules=(rich)
+    else
+      modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+    fi
     for module in "${modules[@]}"; do
       "$VENV/bin/python" -c "import $module" >/dev/null 2>&1 || ZSH_MISSING+=("Python module: $module")
     done
@@ -212,7 +216,11 @@ ZSH_MISSING=()
 [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || ZSH_MISSING+=("zsh-history-substring-search")
 [[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
 if [[ -x "$VENV/bin/python" ]]; then
-  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+  if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+    modules=(rich)
+  else
+    modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+  fi
   for module in "${modules[@]}"; do
     if ! "$VENV/bin/python" -c "import $module" >/dev/null 2>&1; then ZSH_MISSING+=("Python module: $module"); fi
   done
