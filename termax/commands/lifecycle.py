@@ -84,7 +84,7 @@ def new(args):
         if missing:
             print("Would install:", ", ".join(missing))
         return 0
-    script = ROOT / "setup-termux.sh"
+    script = ROOT / "termax" / "bootstrap.sh"
     if not script.is_file():
         print("Bootstrap module is missing:", script, file=sys.stderr)
         return 2
