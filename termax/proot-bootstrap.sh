@@ -6,6 +6,8 @@ PACKAGE_FILE="$ROOT/config/debian-packages.txt"
 PYTHON_FILE="$ROOT/config/python-requirements.txt"
 MODE="${1:-install}"
 LOG="$HOME/termax-proot-bootstrap-$(date +%Y%m%d-%H%M%S).log"
+VENV="$HOME/.local/share/termax/venv"
+CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 FAILED=()
 UNAVAILABLE=()
 AVAILABLE=()
@@ -197,7 +199,7 @@ if text != original:
     print(f"  Backed up previous Zsh config: {backup}")
     path.write_text(text, encoding="utf-8")
 PY
-  rm -f "$HOME"/.zcompdump*(N) 2>/dev/null || true
+  find "$HOME" -maxdepth 1 -type f -name '.zcompdump*' -delete
   if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
     cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
   fi
