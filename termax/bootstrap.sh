@@ -175,7 +175,7 @@ for package in "${packages[@]}"; do
   fi
 done
 if (("${#FINAL_MISSING[@]}" > 0)); then
-  printf '  Missing native packages: %s\\n' "${FINAL_MISSING[*]}"
+  printf '  Missing native packages: %s\n' "${FINAL_MISSING[*]}"
   FAILED+=("native Termux final package audit")
 fi
 if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
