@@ -5,15 +5,17 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PKG_FILE="$ROOT/config/termux-packages.txt"
 PY_FILE="$ROOT/config/python-requirements.txt"
 LOG="$HOME/termax-bootstrap-$(date +%Y%m%d-%H%M%S).log"
+FAILED=()
 
 if [[ ! -d "${PREFIX:-}" || ! -x "${PREFIX:-/nonexistent}/bin/pkg" ]]; then
-  echo "ERROR: Run this installer inside Termux." >&2
+  echo "ERROR: Run this installer inside native Termux." >&2
   exit 1
 fi
 if [[ ! -f "$PKG_FILE" || ! -f "$PY_FILE" ]]; then
   echo "ERROR: Missing package manifests in $ROOT/config" >&2
   exit 1
 fi
+if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then set -x; fi
 
 exec > >(tee -a "$LOG") 2>&1
 echo "TERMAX environment bootstrap"
@@ -21,14 +23,25 @@ echo "Termux: ${TERMUX_VERSION:-unknown} | Android: $(uname -m)"
 echo "Log: $LOG"
 
 mapfile -t packages < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$PKG_FILE")
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  minimal=(bash ca-certificates curl git python python-pip zsh zsh-completions fzf ripgrep fd jq)
+  filtered=()
+  for package in "${packages[@]}"; do
+    for keep in "${minimal[@]}"; do
+      if [[ "$package" == "$keep" ]]; then filtered+=("$package"); break; fi
+    done
+  done
+  packages=("${filtered[@]}")
+  echo "Minimal package profile selected."
+fi
+
 echo
 echo "Updating Termux package indexes..."
-pkg update -y || { echo "ERROR: pkg update failed"; exit 1; }
-pkg upgrade -y || echo "WARNING: pkg upgrade reported a failure; continuing."
+if ! pkg update -y; then echo "ERROR: pkg update failed"; exit 1; fi
+if ! pkg upgrade -y; then echo "ERROR: pkg upgrade failed"; exit 1; fi
 
 echo
 echo "Installing ${#packages[@]} explicitly requested Termux packages..."
-failed=()
 for package in "${packages[@]}"; do
   if dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
     echo "[already installed] $package"
@@ -36,17 +49,21 @@ for package in "${packages[@]}"; do
   fi
   echo "[install] $package"
   if ! pkg install -y "$package"; then
-    failed+=("$package")
+    FAILED+=("$package")
     echo "[FAILED] $package"
   fi
 done
 
 echo
 echo "Installing Python dependencies..."
-python -m pip install --upgrade pip
-if ! python -m pip install -r "$PY_FILE"; then
-  echo "WARNING: Python dependency installation reported errors."
-  python -m pip check || true
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  python -m pip install --upgrade pip rich
+else
+  python -m pip install --upgrade pip
+  if ! python -m pip install -r "$PY_FILE"; then
+    FAILED+=("Python requirements")
+    echo "Python dependency installation failed."
+  fi
 fi
 
 echo
@@ -55,9 +72,9 @@ HAD_ZSHRC=0
 
 echo "Installing Oh My Zsh..."
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
-  RUNZSH=no CHSH=no KEEP_ZSHRC=yes     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
-      echo "ERROR: Oh My Zsh installation failed"; exit 1;
-    }
+  RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
+    echo "ERROR: Oh My Zsh installation failed"; exit 1;
+  }
 else
   echo "Oh My Zsh already exists; leaving it in place."
 fi
@@ -80,8 +97,6 @@ clone_plugin https://github.com/zsh-users/zsh-history-substring-search.git "$ZSH
 
 ZRC="$HOME/.zshrc"
 if (( HAD_ZSHRC == 0 )); then
-  # Oh My Zsh creates a default .zshrc during its unattended install.
-  # Configure that generated file; never overwrite a pre-existing personal .zshrc.
   sed -i 's|^[[:space:]]*ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' "$ZRC"
   sed -i 's|^[[:space:]]*plugins=.*|plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)|' "$ZRC"
   if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
@@ -101,22 +116,16 @@ else
 export PATH="$HOME/.local/bin:$PATH"
 EOF
   fi
-  echo "Existing .zshrc preserved; no theme or plugin settings overwritten."
+  echo "Existing .zshrc backed up and preserved; theme/plugin settings were not overwritten."
 fi
 
 mkdir -p "$HOME/.local/bin"
-if command -v zsh >/dev/null 2>&1; then
-  chsh -s "$(command -v zsh)" || echo "WARNING: Could not set login shell automatically."
-fi
-
 echo
-echo "Bootstrap complete."
-if (("${#failed[@]}" > 0)); then
-  echo "Packages not installed: ${failed[*]}"
-  echo "Check repository availability and the log: $LOG"
-else
-  echo "All manifest Termux packages installed."
+if (("${#FAILED[@]}" > 0)); then
+  echo "Bootstrap completed with failures: ${FAILED[*]}"
+  echo "Review the log: $LOG"
+  exit 1
 fi
-echo "Run: bash "$ROOT/audit-termux.sh""
-echo "Then close and reopen Termux, or run: exec zsh"
+echo "Bootstrap complete."
+echo "No login-shell change was made. To switch manually after reviewing, run: chsh -s $(command -v zsh)"
 echo "Termux:API also requires the separate Android Termux:API companion app."
