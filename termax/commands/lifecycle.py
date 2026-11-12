@@ -176,6 +176,8 @@ def new(args):
     if args.minimal:
         essentials = {"bash", "ca-certificates", "curl", "git", "python", "python-pip", "proot-distro", "zsh", "zsh-completions", "fzf", "ripgrep", "fd", "jq"}
         packages = [p for p in packages if p in essentials]
+        debian_essentials = {"bash", "ca-certificates", "curl", "git", "python3", "python3-pip", "python3-venv", "zsh", "fzf", "ripgrep", "fd-find", "jq"}
+        debian_packages = [p for p in debian_packages if p in debian_essentials]
     print("TERMAX minimal bootstrap" if args.minimal else "TERMAX full environment bootstrap")
     print(f"Planned Termux packages: {len(packages)}")
     print(f"Planned Debian proot packages: {len(debian_packages)}")
