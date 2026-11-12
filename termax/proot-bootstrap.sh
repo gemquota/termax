@@ -21,7 +21,7 @@ if [[ ! -f "$PACKAGE_FILE" || ! -f "$PYTHON_FILE" ]]; then
   exit 2
 fi
 if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then set -x; fi
-exec > >(tee -a "$LOG") 2>&1
+if [[ "$MODE" != "check" ]]; then exec > >(tee -a "$LOG") 2>&1; fi
 
 echo
 echo "============================================================"
@@ -77,6 +77,12 @@ if [[ "$MODE" == "check" ]]; then
   [[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autocomplete")
   [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || ZSH_MISSING+=("zsh-history-substring-search")
   [[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
+  if [[ -x "$VENV/bin/python" ]]; then
+    modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+    for module in "${modules[@]}"; do
+      "$VENV/bin/python" -c "import $module" >/dev/null 2>&1 || ZSH_MISSING+=("Python module: $module")
+    done
+  fi
   echo "Read-only Debian package audit: ${#MISSING[@]} missing."
   echo "Read-only Debian Zsh/Python audit: ${#ZSH_MISSING[@]} missing."
   (("${#MISSING[@]}" == 0 && "${#ZSH_MISSING[@]}" == 0 && "${#UNAVAILABLE[@]}" == 0)) || exit 1
@@ -164,8 +170,69 @@ path = Path(sys.argv[1])
 original = path.read_text(encoding="utf-8")
 text = original
 theme = 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-plugins = 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)'
-source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*$'
+managed = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-autocomplete",
+           "zsh-history-substring-search", "colored-man-pages"]
+source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+    if backup.exists():
+        backup = backup.with_name(backup.name + "-" + str(time.time_ns()))
+    backup.write_text(original, encoding="utf-8")
+    print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+  if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+    cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+  fi
+  zsh -n "$ZRC" || FAILED+=("Debian .zshrc syntax")
+fi
+
+FINAL_MISSING=()
+for package in "${AVAILABLE[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+ZSH_MISSING=()
+[[ -d "$HOME/.oh-my-zsh" ]] || ZSH_MISSING+=("Oh My Zsh")
+[[ -f "$HOME/.zshrc" ]] || ZSH_MISSING+=(".zshrc")
+[[ -f "$HOME/.p10k.zsh" ]] || ZSH_MISSING+=(".p10k.zsh")
+[[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || ZSH_MISSING+=("Powerlevel10k")
+[[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autosuggestions")
+[[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || ZSH_MISSING+=("zsh-syntax-highlighting")
+[[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autocomplete")
+[[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || ZSH_MISSING+=("zsh-history-substring-search")
+[[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
+if [[ -x "$VENV/bin/python" ]]; then
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+  for module in "${modules[@]}"; do
+    if ! "$VENV/bin/python" -c "import $module" >/dev/null 2>&1; then ZSH_MISSING+=("Python module: $module"); fi
+  done
+fi
+echo "Final Debian package audit: ${#FINAL_MISSING[@]} missing."
+if (("${#FINAL_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${FINAL_MISSING[*]}"; FAILED+=("Debian final package audit"); fi
+echo "Final Debian Zsh/Python audit: ${#ZSH_MISSING[@]} missing."
+if (("${#ZSH_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${ZSH_MISSING[*]}"; FAILED+=("Debian final Zsh/Python audit"); fi
+
+if (("${#UNAVAILABLE[@]}" > 0)); then
+  echo "NOTE: Some Termux tools have no package under the same name in this Debian apt configuration."
+fi
+if (("${#FAILED[@]}" > 0)); then
+  printf 'FAILED: %s\n' "${FAILED[*]}"
+  exit 1
+fi
+echo "Debian proot environment bootstrap complete."
+echo "WW's existing repository, virtualenv and cookies were not modified."
+echo "No login shell was changed."
+
 if not re.search(r'(?m)^\s*export\s+ZSH=', text):
     text = 'export ZSH="$HOME/.oh-my-zsh"\n' + text
 def set_before_omz(line, pattern):
@@ -178,8 +245,185 @@ def set_before_omz(line, pattern):
             text = text[:found.start()] + line + "\n" + text[found.start():]
         else:
             text += "\n" + line + "\n"
-set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*$')
-set_before_omz(plugins, r'(?m)^\s*plugins=\(.*\)\s*$')
+set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+    backup.write_text(original, encoding="utf-8")
+    print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+  if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+    cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+  fi
+fi
+
+FINAL_MISSING=()
+for package in "${AVAILABLE[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+ZSH_MISSING=()
+[[ -d "$HOME/.oh-my-zsh" ]] || ZSH_MISSING+=("Oh My Zsh")
+[[ -f "$HOME/.zshrc" ]] || ZSH_MISSING+=(".zshrc")
+[[ -f "$HOME/.p10k.zsh" ]] || ZSH_MISSING+=(".p10k.zsh")
+[[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || ZSH_MISSING+=("Powerlevel10k")
+[[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autosuggestions")
+[[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || ZSH_MISSING+=("zsh-syntax-highlighting")
+[[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autocomplete")
+[[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || ZSH_MISSING+=("zsh-history-substring-search")
+[[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
+if [[ -x "$VENV/bin/python" ]]; then
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+  for module in "${modules[@]}"; do
+    if ! "$VENV/bin/python" -c "import $module" >/dev/null 2>&1; then ZSH_MISSING+=("Python module: $module"); fi
+  done
+fi
+echo "Final Debian package audit: ${#FINAL_MISSING[@]} missing."
+if (("${#FINAL_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${FINAL_MISSING[*]}"; FAILED+=("Debian final package audit"); fi
+echo "Final Debian Zsh/Python audit: ${#ZSH_MISSING[@]} missing."
+if (("${#ZSH_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${ZSH_MISSING[*]}"; FAILED+=("Debian final Zsh/Python audit"); fi
+
+if (("${#UNAVAILABLE[@]}" > 0)); then
+  echo "NOTE: Some Termux tools have no package under the same name in this Debian apt configuration."
+fi
+if (("${#FAILED[@]}" > 0)); then
+  printf 'FAILED: %s\n' "${FAILED[*]}"
+  exit 1
+fi
+echo "Debian proot environment bootstrap complete."
+echo "WW's existing repository, virtualenv and cookies were not modified."
+echo "No login shell was changed."
+)
+match = re.search(r'(?m)^\s*plugins=\(([^)]*)\)\s*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+    backup.write_text(original, encoding="utf-8")
+    print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+  if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+    cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+  fi
+fi
+
+FINAL_MISSING=()
+for package in "${AVAILABLE[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+ZSH_MISSING=()
+[[ -d "$HOME/.oh-my-zsh" ]] || ZSH_MISSING+=("Oh My Zsh")
+[[ -f "$HOME/.zshrc" ]] || ZSH_MISSING+=(".zshrc")
+[[ -f "$HOME/.p10k.zsh" ]] || ZSH_MISSING+=(".p10k.zsh")
+[[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || ZSH_MISSING+=("Powerlevel10k")
+[[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autosuggestions")
+[[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || ZSH_MISSING+=("zsh-syntax-highlighting")
+[[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autocomplete")
+[[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || ZSH_MISSING+=("zsh-history-substring-search")
+[[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
+if [[ -x "$VENV/bin/python" ]]; then
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+  for module in "${modules[@]}"; do
+    if ! "$VENV/bin/python" -c "import $module" >/dev/null 2>&1; then ZSH_MISSING+=("Python module: $module"); fi
+  done
+fi
+echo "Final Debian package audit: ${#FINAL_MISSING[@]} missing."
+if (("${#FINAL_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${FINAL_MISSING[*]}"; FAILED+=("Debian final package audit"); fi
+echo "Final Debian Zsh/Python audit: ${#ZSH_MISSING[@]} missing."
+if (("${#ZSH_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${ZSH_MISSING[*]}"; FAILED+=("Debian final Zsh/Python audit"); fi
+
+if (("${#UNAVAILABLE[@]}" > 0)); then
+  echo "NOTE: Some Termux tools have no package under the same name in this Debian apt configuration."
+fi
+if (("${#FAILED[@]}" > 0)); then
+  printf 'FAILED: %s\n' "${FAILED[*]}"
+  exit 1
+fi
+echo "Debian proot environment bootstrap complete."
+echo "WW's existing repository, virtualenv and cookies were not modified."
+echo "No login shell was changed."
+, text)
+existing = match.group(1).split() if match else ["git"]
+plugins = "plugins=(" + " ".join(dict.fromkeys(existing + managed)) + ")"
+if match:
+    text = text[:match.start()] + plugins + text[match.end():]
+else:
+    set_before_omz(plugins, r'(?m)^\s*plugins=\(.*\)\s*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+    backup.write_text(original, encoding="utf-8")
+    print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+  if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+    cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+  fi
+fi
+
+FINAL_MISSING=()
+for package in "${AVAILABLE[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+ZSH_MISSING=()
+[[ -d "$HOME/.oh-my-zsh" ]] || ZSH_MISSING+=("Oh My Zsh")
+[[ -f "$HOME/.zshrc" ]] || ZSH_MISSING+=(".zshrc")
+[[ -f "$HOME/.p10k.zsh" ]] || ZSH_MISSING+=(".p10k.zsh")
+[[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || ZSH_MISSING+=("Powerlevel10k")
+[[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autosuggestions")
+[[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || ZSH_MISSING+=("zsh-syntax-highlighting")
+[[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || ZSH_MISSING+=("zsh-autocomplete")
+[[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || ZSH_MISSING+=("zsh-history-substring-search")
+[[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
+if [[ -x "$VENV/bin/python" ]]; then
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests_toolbelt requests uvicorn textual prompt_toolkit plotext networkx yaml typer)
+  for module in "${modules[@]}"; do
+    if ! "$VENV/bin/python" -c "import $module" >/dev/null 2>&1; then ZSH_MISSING+=("Python module: $module"); fi
+  done
+fi
+echo "Final Debian package audit: ${#FINAL_MISSING[@]} missing."
+if (("${#FINAL_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${FINAL_MISSING[*]}"; FAILED+=("Debian final package audit"); fi
+echo "Final Debian Zsh/Python audit: ${#ZSH_MISSING[@]} missing."
+if (("${#ZSH_MISSING[@]}" > 0)); then printf '  still missing: %s\\n' "${ZSH_MISSING[*]}"; FAILED+=("Debian final Zsh/Python audit"); fi
+
+if (("${#UNAVAILABLE[@]}" > 0)); then
+  echo "NOTE: Some Termux tools have no package under the same name in this Debian apt configuration."
+fi
+if (("${#FAILED[@]}" > 0)); then
+  printf 'FAILED: %s\n' "${FAILED[*]}"
+  exit 1
+fi
+echo "Debian proot environment bootstrap complete."
+echo "WW's existing repository, virtualenv and cookies were not modified."
+echo "No login shell was changed."
+)
 if not re.search(source_pattern, text):
     text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
 if "TERMAX_MANAGED_ZSH" not in text:
