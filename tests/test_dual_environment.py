@@ -34,7 +34,7 @@ class DualEnvironmentBootstrapTests(unittest.TestCase):
     def test_debian_final_audit_runs_after_installation(self):
         proot = (ROOT / "termax/proot-bootstrap.sh").read_text(encoding="utf-8")
         self.assertGreater(proot.rindex("FINAL_MISSING=()"), proot.index("Installing/configuring Debian Zsh"))
-        self.assertIn('zsh -n "$ZRC"', proot)
+        self.assertIn('zsh -n "$HOME/.zshrc"', proot)
 
     def test_debian_check_does_not_create_a_log_or_mutate_packages(self):
         proot = (ROOT / "termax/proot-bootstrap.sh").read_text(encoding="utf-8")
