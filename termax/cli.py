@@ -35,8 +35,6 @@ def _parser():
             q.add_argument("--debug", action="store_true")
             q.set_defaults(module="termax.commands.lifecycle", function="up")
         elif name == "ask":
-            q.add_argument("--new", dest="new_chat", action="store_true")
-            q.add_argument("--debug", action="store_true")
             q.add_argument("prompt", nargs=argparse.REMAINDER)
             q.set_defaults(module="termax.commands.ww", function="ask")
         elif name == "workspace":
@@ -53,7 +51,6 @@ def _parser():
         elif name == "load":
             q.add_argument("archive")
             q.add_argument("--apply", action="store_true")
-            q.add_argument("--confirmed", action="store_true", help=argparse.SUPPRESS)
             q.set_defaults(module="termax.backup", function="restore")
         elif name == "config":
             q.set_defaults(module="termax.commands.config", function="config")
