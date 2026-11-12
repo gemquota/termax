@@ -1,23 +1,38 @@
 import hashlib, io, json, os, tarfile, tempfile, time
 from pathlib import Path, PurePosixPath
+
 SAFE=(".zshrc",".p10k.zsh",".gitconfig",".config/starship.toml",".config/zellij/config.kdl",".termux/termux.properties",".local/bin/combine-project",".local/bin/weather")
 DENY={".ssh",".gnupg",".pki","history","hosts.yml",".env",".env.local","id_rsa","id_ed25519","credentials.json"}
+
 def safe_path(value):
     p=PurePosixPath(value)
-    if p.is_absolute() or not p.parts or ".." in p.parts or any(x in DENY for x in p.parts) or str(p) not in SAFE: raise ValueError("path is not in the TERMAX backup allowlist: "+value)
+    if p.is_absolute() or not p.parts or ".." in p.parts or any(x in DENY for x in p.parts) or str(p) not in SAFE:
+        raise ValueError("path is not in the TERMAX backup allowlist: "+value)
     return p
+
 def digest(data): return hashlib.sha256(data).hexdigest()
+
 def backup(args):
-    out=Path.home()/".local/share/termax/backups"; out.mkdir(parents=True,exist_ok=True)
-    target=out/("termax-home-"+time.strftime("%Y%m%d-%H%M%S")+".tar.gz"); entries=[]
+    out=Path.home()/".local/share/termax/backups"
+    out.mkdir(parents=True,exist_ok=True)
+    stamp=time.strftime("%Y%m%d-%H%M%S")
+    target=out/("termax-home-"+stamp+".tar.gz")
+    if target.exists():
+        target=out/("termax-home-"+stamp+"-"+str(os.getpid())+".tar.gz")
+    entries=[]
     with tarfile.open(target,"w:gz") as tf:
         for rel in SAFE:
             p=Path.home()/rel
             if not p.is_file() or p.is_symlink(): continue
-            data=p.read_bytes(); info=tarfile.TarInfo("payload/"+rel); info.size=len(data); info.mode=p.stat().st_mode&0o777
-            tf.addfile(info,io.BytesIO(data)); entries.append({"path":rel,"sha256":digest(data),"size":len(data),"mode":info.mode})
-        raw=json.dumps({"schema":1,"files":entries},indent=2).encode(); info=tarfile.TarInfo("manifest.json"); info.size=len(raw); tf.addfile(info,io.BytesIO(raw))
-    print("Backup:",target,"Files:",len(entries)); return 0
+            data=p.read_bytes()
+            info=tarfile.TarInfo("payload/"+rel); info.size=len(data); info.mode=p.stat().st_mode&0o777
+            tf.addfile(info,io.BytesIO(data))
+            entries.append({"path":rel,"sha256":digest(data),"size":len(data),"mode":info.mode})
+        raw=json.dumps({"schema":1,"files":entries},indent=2).encode()
+        info=tarfile.TarInfo("manifest.json"); info.size=len(raw); tf.addfile(info,io.BytesIO(raw))
+    print("Saved:",target,"Files:",len(entries))
+    return 0
+
 def load(path):
     with tarfile.open(path,"r:gz") as tf:
         members=tf.getmembers(); names=[m.name for m in members]
@@ -35,6 +50,7 @@ def load(path):
             result[rel]=(data,int(item.get("mode",0o600))&0o777)
         if set(names)!={"manifest.json"}|{"payload/"+x for x in result}: raise ValueError("unlisted archive entries")
         return result
+
 def safe_destination(home,rel):
     p=home/rel; cur=home
     for part in PurePosixPath(rel).parts[:-1]:
@@ -43,12 +59,21 @@ def safe_destination(home,rel):
     try: p.resolve(strict=False).relative_to(home.resolve())
     except ValueError: raise ValueError("destination escapes home")
     return p
+
 def restore(args):
     try: payload=load(Path(args.archive).expanduser())
     except Exception as e: print("ERROR:",e); return 2
     home=Path.home(); print("Validated",len(payload),"file(s)")
     for rel in payload: print("CREATE/REPLACE",home/rel)
-    if not args.apply: print("DRY RUN. Add --apply to restore."); return 0
+    if not args.apply:
+        print("PREVIEW ONLY. Re-run with --apply to restore.")
+        return 0
+    if not getattr(args,"confirmed",False):
+        try: answer=input("Apply this restore? Existing files will be replaced. [y/N] ").strip().lower()
+        except EOFError: answer=""
+        if answer not in ("y","yes"):
+            print("Restore cancelled; no files changed.")
+            return 1
     stamp=time.strftime("%Y%m%d-%H%M%S"); old={}
     for rel in payload:
         p=safe_destination(home,rel)
@@ -58,7 +83,8 @@ def restore(args):
     rollback=home/(".termax-rollback-"+stamp+".tar.gz")
     with tarfile.open(rollback,"w:gz") as tf:
         for rel,(data,mode) in old.items():
-            info=tarfile.TarInfo("payload/"+rel); info.size=len(data); info.mode=mode; tf.addfile(info,io.BytesIO(data))
+            info=tarfile.TarInfo("payload/"+rel); info.size=len(data); info.mode=mode
+            tf.addfile(info,io.BytesIO(data))
     done=[]
     try:
         for rel,(data,mode) in payload.items():
@@ -72,8 +98,7 @@ def restore(args):
             p=safe_destination(home,rel)
             if rel in old: p.write_bytes(old[rel][0]); os.chmod(p,old[rel][1])
             else: p.unlink(missing_ok=True)
-        print("Rollback snapshot:",rollback); raise
-    print("Restored",len(done),"files. Snapshot:",rollback); return 0
-def add_subcommands(sub):
-    p=sub.add_parser("backup",help="create filtered config backup"); p.set_defaults(handler=backup)
-    p=sub.add_parser("restore",help="preview/apply validated backup"); p.add_argument("archive"); p.add_argument("--apply",action="store_true"); p.set_defaults(handler=restore)
+        print("Rollback snapshot:",rollback)
+        raise
+    print("Restored",len(done),"files. Snapshot:",rollback)
+    return 0
