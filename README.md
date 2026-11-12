@@ -37,7 +37,7 @@ Every command has a full name and a short alias. Both forms behave identically.
 
 - `tx new`: full setup by default; supports `--minimal`, `--full`, `--check`, and `--debug`.
 - `tx up`: automatically runs preflight, updates Termux packages, installs missing manifest packages, refreshes Python requirements, performs a final audit, and writes `~/termax-report.txt`.
-- `tx up --check`: read-only preflight and action plan. It does not update or install anything.
+- `tx up --check`: read-only preflight for missing Termux packages, Python modules, and Zsh components. It prints and reports the proposed maintenance plan without applying changes.
 - `tx up --debug`: same maintenance workflow with detailed command output.
 - Safe package updates and missing-manifest-package installs are automatic. TERMAX does not silently remove packages or overwrite personal configuration.
 - Reports are never silently overwritten. If the default report exists, TERMAX offers a timestamped filename or another path.
