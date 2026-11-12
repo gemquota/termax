@@ -1,6 +1,6 @@
 import importlib.util, os, platform, shutil
-COMMANDS = ("zsh","git","python","fzf","zoxide","rg","fd","bat","eza","chafa","dot","nvim","vim","htop","btop","lazygit","zellij","tmux","termux-api","termux-battery-status","termux-toast")
-MODULES = ("rich","textual","prompt_toolkit","plotext","networkx","yaml","typer")
+COMMANDS = ("zsh","git","python","fzf","zoxide","rg","fd","bat","eza","chafa","dot","nvim","vim","htop","btop","lazygit","zellij","tmux","gum","termux-battery-status","termux-clipboard-get","termux-notification")
+MODULES = ("rich","cloudscraper","fastapi","httplib2","opentelemetry","requests","requests_toolbelt","uvicorn","textual","prompt_toolkit","plotext","networkx","yaml","typer")
 def probe():
     found={n:shutil.which(n) for n in COMMANDS}
     mods={n:importlib.util.find_spec(n) is not None for n in MODULES}
