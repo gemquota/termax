@@ -1,4 +1,4 @@
-import tempfile
+import io\nimport tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -38,7 +38,7 @@ class LifecyclePreflightTests(unittest.TestCase):
             default.write_text("keep me", encoding="utf-8")
             with (
                 mock.patch.object(Path, "home", return_value=home),
-                mock.patch.object(lifecycle.sys.stdin, "isatty", return_value=False),
+                mock.patch.object(lifecycle.sys, "stdin", new=io.StringIO()),
                 mock.patch.object(lifecycle.time, "strftime", return_value="20261112-123456"),
             ):
                 lifecycle._write_report(["new report"])
