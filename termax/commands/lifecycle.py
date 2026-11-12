@@ -61,8 +61,17 @@ def _proot_run(mode, debug=False, stream=True, minimal=False):
     if minimal:
         env["TERMAX_MINIMAL"] = "1"
     command = [
-        "proot-distro", "login", "debian", "--",
-        "/bin/bash", "--noprofile", "--norc", str(script), mode,
+        "proot-distro", "login", "debian",
+        "--bind", f"{ROOT}:/mnt/termax-source", "--",
+        "/usr/bin/env",
+    ]
+    if debug:
+        command.append("TERMAX_DEBUG=1")
+    if minimal:
+        command.append("TERMAX_MINIMAL=1")
+    command += [
+        "/bin/bash", "--noprofile", "--norc",
+        "/mnt/termax-source/termax/proot-bootstrap.sh", mode,
     ]
     return _run(command, debug=debug, env=env, stream=stream)
 
@@ -120,13 +129,23 @@ def _zsh_audit():
     home = Path.home()
     custom = Path(os.environ.get("ZSH_CUSTOM", str(home / ".oh-my-zsh/custom")))
     checks = {
+        "Zsh executable": which("zsh") is not None,
         "Oh My Zsh": (home / ".oh-my-zsh").is_dir(),
         ".zshrc": (home / ".zshrc").is_file(),
-        "Powerlevel10k": (custom / "themes/powerlevel10k").is_dir(),
+        "Powerlevel10k": (custom / "themes/powerlevel10k/powerlevel10k.zsh-theme").is_file(),
         "Powerlevel10k config": (home / ".p10k.zsh").is_file(),
+        "zshrc syntax": not (which("zsh") and (home / ".zshrc").is_file()) or
+            subprocess.run([which("zsh"), "-n", str(home / ".zshrc")],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0,
     }
-    for plugin in ("zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-autocomplete", "zsh-history-substring-search"):
-        checks[plugin] = (custom / "plugins" / plugin).is_dir()
+    plugin_files = {
+        "zsh-autosuggestions": "zsh-autosuggestions.plugin.zsh",
+        "zsh-syntax-highlighting": "zsh-syntax-highlighting.zsh",
+        "zsh-autocomplete": "zsh-autocomplete.plugin.zsh",
+        "zsh-history-substring-search": "zsh-history-substring-search.zsh",
+    }
+    for plugin, filename in plugin_files.items():
+        checks[plugin] = (custom / "plugins" / plugin / filename).is_file()
     return checks
 
 def _repair_zsh(debug, failures):
@@ -185,15 +204,27 @@ def new(args):
     print("TERMAX manages both native Termux and Debian proot. WW itself remains untouched.")
     if args.check:
         missing = [p for p in packages if not _package_state(p)]
+        modules = probe()["modules"]
+        module_scope = {"rich": modules.get("rich", False)} if args.minimal else modules
+        missing_modules = [name for name, present in module_scope.items() if not present]
+        shell = _zsh_audit()
+        missing_shell = [name for name, present in shell.items() if not present]
         print(f"Read-only preview: {len(missing)} native Termux packages missing.")
         if missing:
             print("Would install:", ", ".join(missing))
+        print(f"Native Python modules missing: {len(missing_modules)}")
+        if missing_modules:
+            print("Would install Python requirements for:", ", ".join(missing_modules))
+        print(f"Native Zsh components missing: {len(missing_shell)}")
+        if missing_shell:
+            print("Would repair:", ", ".join(missing_shell))
+        debian_status = 1
         if _proot_ready():
-            print("Debian proot is present. Checking its package manifest...")
-            _proot_run("check", debug=args.debug, stream=True, minimal=args.minimal)
+            print("Debian proot is present. Checking its package, Python and Zsh manifests...")
+            debian_status = _proot_run("check", debug=args.debug, stream=True, minimal=args.minimal)
         else:
-            print("Debian proot is absent or not ready; tx new will install the Debian distribution and its TERMAX package set.")
-        return 0
+            print("Debian proot is absent or not ready; the full bootstrap will provision it.")
+        return 1 if missing or missing_modules or missing_shell or debian_status else 0
     script = ROOT / "termax" / "bootstrap.sh"
     if not script.is_file():
         print("Internal bootstrap module is missing:", script, file=sys.stderr)
@@ -250,12 +281,18 @@ def up(args):
         print("READ-ONLY CHECK: proposed actions follow; no changes will be made.")
         for item in lines[lines.index("PROPOSED ACTION PLAN") + 1:]:
             print(item)
+        debian_check_status = 1
         if _proot_ready():
-            print("Debian proot read-only package check:")
-            _proot_run("check", debug=args.debug, stream=True)
-        lines += ["", "MODE: read-only check", "No changes applied in either environment."]
+            print("Debian proot read-only package/Python/Zsh check:")
+            debian_check_status = _proot_run("check", debug=args.debug, stream=True)
+        else:
+            print("Debian proot is not ready.")
+        lines += ["", "MODE: read-only check",
+                  f"Debian read-only audit: {'passed' if debian_check_status == 0 else 'failed or unavailable'}",
+                  "No changes applied in either environment."]
+
         _write_report(lines)
-        return 0
+        return 1 if missing or missing_modules or missing_shell_preflight or debian_check_status else 0
     failures = []
     print("Running the unified native Termux + Debian proot maintenance workflow...")
     bootstrap = ROOT / "termax" / "bootstrap.sh"
@@ -269,6 +306,9 @@ def up(args):
     final_missing_modules = [name for name, present in final_data["modules"].items() if not present]
     zsh_checks = _zsh_audit()
     missing_shell = [name for name, present in zsh_checks.items() if not present]
+    debian_final_status = _proot_run("check", debug=args.debug, stream=True) if _proot_ready() else 1
+    if debian_final_status:
+        failures.append("Debian final package/Python/Zsh audit")
     lines += [
         "", "MODE: maintenance",
         "Actions: native Termux package/Python/Zsh maintenance plus Debian apt packages, isolated Python venv, Oh My Zsh, Powerlevel10k and plugins",
@@ -279,6 +319,7 @@ def up(args):
         f"Missing native Zsh components: {len(missing_shell)}",
         "Missing native Zsh components: " + (", ".join(missing_shell) if missing_shell else "none"),
         f"Debian proot: {'present' if _proot_ready() else 'not ready'}",
+        f"Debian final audit: {'passed' if debian_final_status == 0 else 'failed or unavailable'}",
         "Failures: " + (", ".join(failures) if failures else "none"),
         "", "DIAGNOSTICS",
     ]

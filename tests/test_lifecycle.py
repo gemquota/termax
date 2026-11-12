@@ -23,10 +23,12 @@ class LifecyclePreflightTests(unittest.TestCase):
                 mock.patch.object(lifecycle, "_zsh_audit", return_value={"Oh My Zsh": True}),
                 mock.patch.object(lifecycle, "_write_report") as report,
                 mock.patch.object(lifecycle, "_run") as run,
+                mock.patch.object(lifecycle, "_proot_ready", return_value=True),
+                mock.patch.object(lifecycle, "_proot_run", return_value=0),
                 mock.patch.object(Path, "home", return_value=Path(temp)),
             ):
                 result = lifecycle.up(SimpleNamespace(check=True, debug=False))
-        self.assertEqual(result, 0)
+        self.assertEqual(result, 1)
         run.assert_not_called()
         report.assert_called_once()
         self.assertIn("PROPOSED ACTION PLAN", report.call_args.args[0])

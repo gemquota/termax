@@ -156,16 +156,49 @@ fi
 if command -v proot-distro >/dev/null 2>&1 && proot-distro login debian -- /bin/true >/dev/null 2>&1; then
   echo
   echo "[6/6] Installing Debian proot packages, Python environment and Zsh stack..."
-  PROOT_ARGS=(login debian -- /bin/bash --noprofile --norc "$PROOT_SCRIPT")
-  if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then
-    TERMAX_DEBUG=1 proot-distro "${PROOT_ARGS[@]}" install || FAILED+=("Debian proot bootstrap")
-  else
-    proot-distro "${PROOT_ARGS[@]}" install || FAILED+=("Debian proot bootstrap")
-  fi
+  PROOT_ARGS=(login debian --bind "$APP_ROOT:/mnt/termax-source" -- /usr/bin/env)
+  if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_DEBUG=1); fi
+  if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_MINIMAL=1); fi
+  PROOT_ARGS+=(/bin/bash --noprofile --norc /mnt/termax-source/termax/proot-bootstrap.sh install)
+  proot-distro "${PROOT_ARGS[@]}" || FAILED+=("Debian proot bootstrap")
 else
   FAILED+=("Debian proot unavailable; WW was left untouched")
 fi
 
+
+echo
+echo "Final native Termux audit..."
+FINAL_MISSING=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+if (("${#FINAL_MISSING[@]}" > 0)); then
+  printf '  Missing native packages: %s\n' "${FINAL_MISSING[*]}"
+  FAILED+=("native Termux final package audit")
+fi
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  modules=(rich)
+else
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests requests_toolbelt uvicorn textual prompt_toolkit plotext networkx yaml typer)
+fi
+for module in "${modules[@]}"; do
+  if ! python -c "import $module" >/dev/null 2>&1; then FAILED+=("native Python module: $module"); fi
+done
+if command -v zsh >/dev/null 2>&1; then
+  [[ -d "$HOME/.oh-my-zsh" ]] || FAILED+=("native Oh My Zsh")
+  [[ -f "$HOME/.zshrc" ]] || FAILED+=("native .zshrc")
+  [[ -f "$HOME/.p10k.zsh" ]] || FAILED+=("native .p10k.zsh")
+  [[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || FAILED+=("native Powerlevel10k")
+  [[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || FAILED+=("native zsh-autosuggestions")
+  [[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || FAILED+=("native zsh-syntax-highlighting")
+  [[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || FAILED+=("native zsh-autocomplete")
+  [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || FAILED+=("native zsh-history-substring-search")
+  zsh -n "$HOME/.zshrc" || FAILED+=("native .zshrc syntax")
+else
+  FAILED+=("native zsh executable missing")
+fi
 echo
 if (("${#FAILED[@]}" > 0)); then
   echo "TERMAX bootstrap completed with failures:"
