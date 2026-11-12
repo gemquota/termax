@@ -169,7 +169,7 @@ def new(args):
     packages = _manifest(PACKAGE_MANIFEST)
     requirements = _manifest(PYTHON_MANIFEST)
     if args.minimal:
-        essentials = {"bash", "ca-certificates", "curl", "git", "python", "python-pip", "zsh", "zsh-completions", "fzf", "ripgrep", "fd", "jq"}
+        essentials = {"bash", "ca-certificates", "curl", "git", "python", "python-pip", "proot-distro", "zsh", "zsh-completions", "fzf", "ripgrep", "fd", "jq"}
         packages = [p for p in packages if p in essentials]
     print("TERMAX minimal bootstrap" if args.minimal else "TERMAX full environment bootstrap")
     print(f"Planned Termux packages: {len(packages)}")
