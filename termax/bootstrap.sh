@@ -104,9 +104,104 @@ path = Path(sys.argv[1])
 original = path.read_text(encoding="utf-8")
 text = original
 theme = 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-plugins = 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)'
-source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*$'
-match = re.search(source_pattern, text)
+managed = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-autocomplete",
+           "zsh-history-substring-search", "colored-man-pages"]
+source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    if path.exists() and original:
+        import time
+        backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+        if backup.exists():
+            backup = backup.with_name(backup.name + "-" + str(time.time_ns()))
+        backup.write_text(original, encoding="utf-8")
+        print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+  cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+fi
+mkdir -p "$HOME/.local/bin"
+
+echo
+echo "[5/6] Ensuring the existing Debian proot is available..."
+if ! command -v proot-distro >/dev/null 2>&1; then
+  FAILED+=("proot-distro command unavailable")
+elif ! proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo "  Debian distribution not found; installing it without touching other distributions..."
+  if ! proot-distro install debian; then
+    FAILED+=("install Debian proot distribution")
+  fi
+fi
+
+if command -v proot-distro >/dev/null 2>&1 && proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo
+  echo "[6/6] Installing Debian proot packages, Python environment and Zsh stack..."
+  PROOT_ARGS=(login debian --bind "$APP_ROOT:/mnt/termax-source" -- /usr/bin/env)
+  if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_DEBUG=1); fi
+  if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_MINIMAL=1); fi
+  PROOT_ARGS+=(/bin/bash --noprofile --norc /mnt/termax-source/termax/proot-bootstrap.sh install)
+  proot-distro "${PROOT_ARGS[@]}" || FAILED+=("Debian proot bootstrap")
+else
+  FAILED+=("Debian proot unavailable; WW was left untouched")
+fi
+
+echo
+echo "Final native Termux audit..."
+FINAL_MISSING=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+if (("${#FINAL_MISSING[@]}" > 0)); then
+  printf '  Missing native packages: %s\\n' "${FINAL_MISSING[*]}"
+  FAILED+=("native Termux final package audit")
+else
+  echo "  All ${#packages[@]} requested native packages are installed."
+fi
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  modules=(rich)
+else
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests requests_toolbelt uvicorn textual prompt_toolkit plotext networkx yaml typer)
+fi
+for module in "${modules[@]}"; do
+  if ! python -c "import $module" >/dev/null 2>&1; then FAILED+=("native Python module: $module"); fi
+done
+if command -v zsh >/dev/null 2>&1; then
+  [[ -d "$HOME/.oh-my-zsh" ]] || FAILED+=("native Oh My Zsh")
+  [[ -f "$HOME/.zshrc" ]] || FAILED+=("native .zshrc")
+  [[ -f "$HOME/.p10k.zsh" ]] || FAILED+=("native .p10k.zsh")
+  [[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || FAILED+=("native Powerlevel10k")
+  [[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || FAILED+=("native zsh-autosuggestions")
+  [[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || FAILED+=("native zsh-syntax-highlighting")
+  [[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || FAILED+=("native zsh-autocomplete")
+  [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || FAILED+=("native zsh-history-substring-search")
+  zsh -n "$HOME/.zshrc" || FAILED+=("native .zshrc syntax")
+else
+  FAILED+=("native zsh executable missing")
+fi
+echo
+if (("${#FAILED[@]}" > 0)); then
+  echo "TERMAX bootstrap completed with failures:"
+  printf '  - %s\n' "${FAILED[@]}"
+  echo "Review native log: $LOG"
+  exit 1
+fi
+echo "TERMAX native Termux + Debian proot bootstrap complete."
+echo "Zsh/Oh My Zsh/Powerlevel10k are installed in both environments."
+echo "Existing .zshrc files were backed up before TERMAX changes."
+echo "WW's repository, virtualenv and cookies were not modified."
+echo "No login shell was changed automatically."
+echo "Termux:API also requires the separate Android companion app and permissions."
+
 if not re.search(r'(?m)^\s*export\s+ZSH=', text):
     text = 'export ZSH="$HOME/.oh-my-zsh"\n' + text
 def set_before_omz(line, pattern):
@@ -119,8 +214,293 @@ def set_before_omz(line, pattern):
             text = text[:found.start()] + line + "\n" + text[found.start():]
         else:
             text += "\n" + line + "\n"
-set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*$')
-set_before_omz(plugins, r'(?m)^\s*plugins=\(.*\)\s*$')
+set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    if path.exists() and original:
+        import time
+        backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+        backup.write_text(original, encoding="utf-8")
+        print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+  cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+fi
+mkdir -p "$HOME/.local/bin"
+
+echo
+echo "[5/6] Ensuring the existing Debian proot is available..."
+if ! command -v proot-distro >/dev/null 2>&1; then
+  FAILED+=("proot-distro command unavailable")
+elif ! proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo "  Debian distribution not found; installing it without touching other distributions..."
+  if ! proot-distro install debian; then
+    FAILED+=("install Debian proot distribution")
+  fi
+fi
+
+if command -v proot-distro >/dev/null 2>&1 && proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo
+  echo "[6/6] Installing Debian proot packages, Python environment and Zsh stack..."
+  PROOT_ARGS=(login debian --bind "$APP_ROOT:/mnt/termax-source" -- /usr/bin/env)
+  if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_DEBUG=1); fi
+  if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_MINIMAL=1); fi
+  PROOT_ARGS+=(/bin/bash --noprofile --norc /mnt/termax-source/termax/proot-bootstrap.sh install)
+  proot-distro "${PROOT_ARGS[@]}" || FAILED+=("Debian proot bootstrap")
+else
+  FAILED+=("Debian proot unavailable; WW was left untouched")
+fi
+
+echo
+echo "Final native Termux audit..."
+FINAL_MISSING=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+if (("${#FINAL_MISSING[@]}" > 0)); then
+  printf '  Missing native packages: %s\\n' "${FINAL_MISSING[*]}"
+  FAILED+=("native Termux final package audit")
+else
+  echo "  All ${#packages[@]} requested native packages are installed."
+fi
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  modules=(rich)
+else
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests requests_toolbelt uvicorn textual prompt_toolkit plotext networkx yaml typer)
+fi
+for module in "${modules[@]}"; do
+  if ! python -c "import $module" >/dev/null 2>&1; then FAILED+=("native Python module: $module"); fi
+done
+if command -v zsh >/dev/null 2>&1; then
+  [[ -d "$HOME/.oh-my-zsh" ]] || FAILED+=("native Oh My Zsh")
+  [[ -f "$HOME/.zshrc" ]] || FAILED+=("native .zshrc")
+  [[ -f "$HOME/.p10k.zsh" ]] || FAILED+=("native .p10k.zsh")
+  [[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || FAILED+=("native Powerlevel10k")
+  [[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || FAILED+=("native zsh-autosuggestions")
+  [[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || FAILED+=("native zsh-syntax-highlighting")
+  [[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || FAILED+=("native zsh-autocomplete")
+  [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || FAILED+=("native zsh-history-substring-search")
+  zsh -n "$HOME/.zshrc" || FAILED+=("native .zshrc syntax")
+else
+  FAILED+=("native zsh executable missing")
+fi
+echo
+if (("${#FAILED[@]}" > 0)); then
+  echo "TERMAX bootstrap completed with failures:"
+  printf '  - %s\n' "${FAILED[@]}"
+  echo "Review native log: $LOG"
+  exit 1
+fi
+echo "TERMAX native Termux + Debian proot bootstrap complete."
+echo "Zsh/Oh My Zsh/Powerlevel10k are installed in both environments."
+echo "Existing .zshrc files were backed up before TERMAX changes."
+echo "WW's repository, virtualenv and cookies were not modified."
+echo "No login shell was changed automatically."
+echo "Termux:API also requires the separate Android companion app and permissions."
+)
+match = re.search(r'(?m)^\s*plugins=\(([^)]*)\)\s*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    if path.exists() and original:
+        import time
+        backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+        backup.write_text(original, encoding="utf-8")
+        print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+  cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+fi
+mkdir -p "$HOME/.local/bin"
+
+echo
+echo "[5/6] Ensuring the existing Debian proot is available..."
+if ! command -v proot-distro >/dev/null 2>&1; then
+  FAILED+=("proot-distro command unavailable")
+elif ! proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo "  Debian distribution not found; installing it without touching other distributions..."
+  if ! proot-distro install debian; then
+    FAILED+=("install Debian proot distribution")
+  fi
+fi
+
+if command -v proot-distro >/dev/null 2>&1 && proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo
+  echo "[6/6] Installing Debian proot packages, Python environment and Zsh stack..."
+  PROOT_ARGS=(login debian --bind "$APP_ROOT:/mnt/termax-source" -- /usr/bin/env)
+  if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_DEBUG=1); fi
+  if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_MINIMAL=1); fi
+  PROOT_ARGS+=(/bin/bash --noprofile --norc /mnt/termax-source/termax/proot-bootstrap.sh install)
+  proot-distro "${PROOT_ARGS[@]}" || FAILED+=("Debian proot bootstrap")
+else
+  FAILED+=("Debian proot unavailable; WW was left untouched")
+fi
+
+echo
+echo "Final native Termux audit..."
+FINAL_MISSING=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+if (("${#FINAL_MISSING[@]}" > 0)); then
+  printf '  Missing native packages: %s\\n' "${FINAL_MISSING[*]}"
+  FAILED+=("native Termux final package audit")
+else
+  echo "  All ${#packages[@]} requested native packages are installed."
+fi
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  modules=(rich)
+else
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests requests_toolbelt uvicorn textual prompt_toolkit plotext networkx yaml typer)
+fi
+for module in "${modules[@]}"; do
+  if ! python -c "import $module" >/dev/null 2>&1; then FAILED+=("native Python module: $module"); fi
+done
+if command -v zsh >/dev/null 2>&1; then
+  [[ -d "$HOME/.oh-my-zsh" ]] || FAILED+=("native Oh My Zsh")
+  [[ -f "$HOME/.zshrc" ]] || FAILED+=("native .zshrc")
+  [[ -f "$HOME/.p10k.zsh" ]] || FAILED+=("native .p10k.zsh")
+  [[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || FAILED+=("native Powerlevel10k")
+  [[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || FAILED+=("native zsh-autosuggestions")
+  [[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || FAILED+=("native zsh-syntax-highlighting")
+  [[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || FAILED+=("native zsh-autocomplete")
+  [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || FAILED+=("native zsh-history-substring-search")
+  zsh -n "$HOME/.zshrc" || FAILED+=("native .zshrc syntax")
+else
+  FAILED+=("native zsh executable missing")
+fi
+echo
+if (("${#FAILED[@]}" > 0)); then
+  echo "TERMAX bootstrap completed with failures:"
+  printf '  - %s\n' "${FAILED[@]}"
+  echo "Review native log: $LOG"
+  exit 1
+fi
+echo "TERMAX native Termux + Debian proot bootstrap complete."
+echo "Zsh/Oh My Zsh/Powerlevel10k are installed in both environments."
+echo "Existing .zshrc files were backed up before TERMAX changes."
+echo "WW's repository, virtualenv and cookies were not modified."
+echo "No login shell was changed automatically."
+echo "Termux:API also requires the separate Android companion app and permissions."
+, text)
+existing = match.group(1).split() if match else ["git"]
+plugins = "plugins=(" + " ".join(dict.fromkeys(existing + managed)) + ")"
+if match:
+    text = text[:match.start()] + plugins + text[match.end():]
+else:
+    set_before_omz(plugins, r'(?m)^\s*plugins=\(.*\)\s*
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    if path.exists() and original:
+        import time
+        backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+        backup.write_text(original, encoding="utf-8")
+        print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PY
+if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+  cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+fi
+mkdir -p "$HOME/.local/bin"
+
+echo
+echo "[5/6] Ensuring the existing Debian proot is available..."
+if ! command -v proot-distro >/dev/null 2>&1; then
+  FAILED+=("proot-distro command unavailable")
+elif ! proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo "  Debian distribution not found; installing it without touching other distributions..."
+  if ! proot-distro install debian; then
+    FAILED+=("install Debian proot distribution")
+  fi
+fi
+
+if command -v proot-distro >/dev/null 2>&1 && proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo
+  echo "[6/6] Installing Debian proot packages, Python environment and Zsh stack..."
+  PROOT_ARGS=(login debian --bind "$APP_ROOT:/mnt/termax-source" -- /usr/bin/env)
+  if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_DEBUG=1); fi
+  if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then PROOT_ARGS+=(TERMAX_MINIMAL=1); fi
+  PROOT_ARGS+=(/bin/bash --noprofile --norc /mnt/termax-source/termax/proot-bootstrap.sh install)
+  proot-distro "${PROOT_ARGS[@]}" || FAILED+=("Debian proot bootstrap")
+else
+  FAILED+=("Debian proot unavailable; WW was left untouched")
+fi
+
+echo
+echo "Final native Termux audit..."
+FINAL_MISSING=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+if (("${#FINAL_MISSING[@]}" > 0)); then
+  printf '  Missing native packages: %s\\n' "${FINAL_MISSING[*]}"
+  FAILED+=("native Termux final package audit")
+else
+  echo "  All ${#packages[@]} requested native packages are installed."
+fi
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  modules=(rich)
+else
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests requests_toolbelt uvicorn textual prompt_toolkit plotext networkx yaml typer)
+fi
+for module in "${modules[@]}"; do
+  if ! python -c "import $module" >/dev/null 2>&1; then FAILED+=("native Python module: $module"); fi
+done
+if command -v zsh >/dev/null 2>&1; then
+  [[ -d "$HOME/.oh-my-zsh" ]] || FAILED+=("native Oh My Zsh")
+  [[ -f "$HOME/.zshrc" ]] || FAILED+=("native .zshrc")
+  [[ -f "$HOME/.p10k.zsh" ]] || FAILED+=("native .p10k.zsh")
+  [[ -f "$CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]] || FAILED+=("native Powerlevel10k")
+  [[ -f "$CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] || FAILED+=("native zsh-autosuggestions")
+  [[ -f "$CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] || FAILED+=("native zsh-syntax-highlighting")
+  [[ -f "$CUSTOM/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || FAILED+=("native zsh-autocomplete")
+  [[ -f "$CUSTOM/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] || FAILED+=("native zsh-history-substring-search")
+  zsh -n "$HOME/.zshrc" || FAILED+=("native .zshrc syntax")
+else
+  FAILED+=("native zsh executable missing")
+fi
+echo
+if (("${#FAILED[@]}" > 0)); then
+  echo "TERMAX bootstrap completed with failures:"
+  printf '  - %s\n' "${FAILED[@]}"
+  echo "Review native log: $LOG"
+  exit 1
+fi
+echo "TERMAX native Termux + Debian proot bootstrap complete."
+echo "Zsh/Oh My Zsh/Powerlevel10k are installed in both environments."
+echo "Existing .zshrc files were backed up before TERMAX changes."
+echo "WW's repository, virtualenv and cookies were not modified."
+echo "No login shell was changed automatically."
+echo "Termux:API also requires the separate Android companion app and permissions."
+)
 if not re.search(source_pattern, text):
     text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
 if "TERMAX_MANAGED_ZSH" not in text:
