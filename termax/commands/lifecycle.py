@@ -120,6 +120,7 @@ def _zsh_audit():
         "Oh My Zsh": (home / ".oh-my-zsh").is_dir(),
         ".zshrc": (home / ".zshrc").is_file(),
         "Powerlevel10k": (custom / "themes/powerlevel10k").is_dir(),
+        "Powerlevel10k config": (home / ".p10k.zsh").is_file(),
     }
     for plugin in ("zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-autocomplete", "zsh-history-substring-search"):
         checks[plugin] = (custom / "plugins" / plugin).is_dir()
@@ -248,27 +249,13 @@ def up(args):
         _write_report(lines)
         return 0
     failures = []
-    print("Updating package indexes...")
-    if _run(["pkg", "update", "-y"], args.debug):
-        failures.append("pkg update")
-    print("Upgrading installed packages...")
-    if _run(["pkg", "upgrade", "-y"], args.debug):
-        failures.append("pkg upgrade")
-    for package in missing:
-        print(f"Installing missing package: {package}")
-        if _run(["pkg", "install", "-y", package], args.debug):
-            failures.append(f"pkg install {package}")
-    print("Refreshing declared Python dependencies...")
-    if _run([sys.executable, "-m", "pip", "install", "-r", str(PYTHON_MANIFEST)], args.debug):
-        failures.append("Python requirements")
-    print("Repairing and updating the native Termux Zsh tools...")
-    _repair_zsh(args.debug, failures)
-    print("Maintaining the Debian proot environment...")
-    if _ensure_debian(args.debug):
-        if _proot_run("maintenance", debug=args.debug, stream=True):
-            failures.append("Debian proot maintenance")
-    else:
-        failures.append("Debian proot unavailable")
+    print("Running the unified native Termux + Debian proot maintenance workflow...")
+    bootstrap = ROOT / "termax" / "bootstrap.sh"
+    env = os.environ.copy()
+    if args.debug:
+        env["TERMAX_DEBUG"] = "1"
+    if _run(["bash", str(bootstrap)], debug=args.debug, env=env, stream=True):
+        failures.append("dual-environment bootstrap/maintenance")
     final_missing = [p for p in packages if not _package_state(p)]
     final_data = probe()
     final_missing_modules = [name for name, present in final_data["modules"].items() if not present]
