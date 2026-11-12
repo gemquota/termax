@@ -59,6 +59,19 @@ class DualEnvironmentBootstrapTests(unittest.TestCase):
         for module in required:
             self.assertIn(f'"{module}"', system)
 
+
+    def test_bootstrap_preserves_existing_user_zsh_plugins(self):
+        for path in ("termax/bootstrap.sh", "termax/proot-bootstrap.sh"):
+            script = (ROOT / path).read_text(encoding="utf-8")
+            self.assertIn("managed_plugins =", script)
+            self.assertIn("existing_plugins + managed_plugins", script)
+            self.assertIn("dict.fromkeys", script)
+
+    def test_zsh_backup_names_do_not_collide_within_one_second(self):
+        for path in ("termax/bootstrap.sh", "termax/proot-bootstrap.sh"):
+            script = (ROOT / path).read_text(encoding="utf-8")
+            self.assertIn("time.time_ns()", script)
+
     def test_debian_python_environment_is_separate_from_ww(self):
         proot = (ROOT / "termax/proot-bootstrap.sh").read_text(encoding="utf-8")
         self.assertIn('$HOME/.local/share/termax/venv', proot)
