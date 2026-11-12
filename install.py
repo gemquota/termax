@@ -19,7 +19,7 @@ def main(argv=None):
     required=("termax/__init__.py","termax/cli.py","termax/registry.py","termax/backup.py",
               "termax/browser.py","termax/system.py","termax/commands/lifecycle.py",
               "termax/commands/ww.py","config/plugins.json","config/aliases.json","config/functions.json",
-              "config/termux-packages.txt","config/python-requirements.txt")
+              "config/termux-packages.txt","config/python-requirements.txt","termax/bootstrap.sh")
     missing=[x for x in required if not (SRC/x).is_file()]
     if missing:
         print("REFUSED: incomplete source tree:",", ".join(missing),file=sys.stderr)
