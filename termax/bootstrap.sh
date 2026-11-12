@@ -1,9 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -uo pipefail
 
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PKG_FILE="$ROOT/../config/termux-packages.txt"
-PY_FILE="$ROOT/../config/python-requirements.txt"
+APP_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PKG_FILE="$APP_ROOT/config/termux-packages.txt"
+PY_FILE="$APP_ROOT/config/python-requirements.txt"
+PROOT_SCRIPT="$APP_ROOT/termax/proot-bootstrap.sh"
 LOG="$HOME/termax-bootstrap-$(date +%Y%m%d-%H%M%S).log"
 FAILED=()
 
@@ -11,20 +12,22 @@ if [[ ! -d "${PREFIX:-}" || ! -x "${PREFIX:-/nonexistent}/bin/pkg" ]]; then
   echo "ERROR: Run this bootstrap inside native Termux." >&2
   exit 1
 fi
-if [[ ! -f "$PKG_FILE" || ! -f "$PY_FILE" ]]; then
-  echo "ERROR: TERMAX manifests are missing." >&2
-  exit 1
-fi
+for required in "$PKG_FILE" "$PY_FILE" "$PROOT_SCRIPT"; do
+  if [[ ! -f "$required" ]]; then echo "ERROR: Missing bootstrap component: $required" >&2; exit 1; fi
+done
 if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then set -x; fi
 exec > >(tee -a "$LOG") 2>&1
 
-echo "TERMAX environment bootstrap"
-echo "Termux: ${TERMUX_VERSION:-unknown} | Android: $(uname -m)"
-echo "Log: $LOG"
+echo
+echo "============================================================"
+echo " TERMAX full environment bootstrap"
+echo " Native Termux + Debian proot"
+echo " Log: $LOG"
+echo "============================================================"
 
 mapfile -t packages < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$PKG_FILE")
 if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
-  minimal=(bash ca-certificates curl git python python-pip zsh zsh-completions fzf ripgrep fd jq)
+  minimal=(bash ca-certificates curl git python python-pip proot-distro zsh zsh-completions fzf ripgrep fd jq)
   filtered=()
   for package in "${packages[@]}"; do
     for keep in "${minimal[@]}"; do
@@ -35,91 +38,132 @@ if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
   echo "Minimal package profile selected."
 fi
 
-echo "Updating Termux package indexes..."
+echo
+echo "[1/6] Updating native Termux..."
 if ! pkg update -y; then echo "ERROR: pkg update failed"; exit 1; fi
 if ! pkg upgrade -y; then echo "ERROR: pkg upgrade failed"; exit 1; fi
 
-echo "Installing ${#packages[@]} explicitly requested Termux packages..."
+echo
+echo "[2/6] Installing native Termux packages (${#packages[@]} requested)..."
 for package in "${packages[@]}"; do
   if dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
-    echo "[already installed] $package"
+    echo "  [present] $package"
     continue
   fi
-  echo "[install] $package"
+  echo "  [install] $package"
   if ! pkg install -y "$package"; then
-    FAILED+=("$package")
-    echo "[FAILED] $package"
+    FAILED+=("Termux package: $package")
+    echo "  [FAILED] $package"
   fi
 done
 
-echo "Installing Python dependencies..."
+echo
+echo "[3/6] Installing native Termux Python requirements..."
 if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
-  if ! python -m pip install --upgrade pip rich; then FAILED+=("minimal Python requirements"); fi
+  if ! python -m pip install --upgrade pip rich; then FAILED+=("Termux minimal Python requirements"); fi
 else
-  if ! python -m pip install --upgrade pip; then FAILED+=("pip upgrade"); fi
-  if ! python -m pip install -r "$PY_FILE"; then FAILED+=("Python requirements"); fi
+  if ! python -m pip install --upgrade pip; then FAILED+=("Termux pip upgrade"); fi
+  if ! python -m pip install -r "$PY_FILE"; then FAILED+=("Termux Python requirements"); fi
 fi
 
-HAD_ZSHRC=0
-[[ -f "$HOME/.zshrc" ]] && HAD_ZSHRC=1
-echo "Installing Oh My Zsh..."
-if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
-  RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
-    echo "ERROR: Oh My Zsh installation failed"; exit 1;
-  }
+echo
+echo "[4/6] Installing native Termux Zsh, Oh My Zsh, Powerlevel10k and plugins..."
+OMZ="$HOME/.oh-my-zsh"
+if [[ ! -d "$OMZ" ]]; then
+  RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || FAILED+=("Termux Oh My Zsh")
 else
-  echo "Oh My Zsh already exists; leaving it in place."
+  echo "  Oh My Zsh already exists."
 fi
-
-ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
-mkdir -p "$ZSH_CUSTOM/plugins" "$ZSH_CUSTOM/themes"
+CUSTOM="${ZSH_CUSTOM:-$OMZ/custom}"
+mkdir -p "$CUSTOM/plugins" "$CUSTOM/themes"
 clone_plugin() {
   local repo="$1" dest="$2"
   if [[ -d "$dest/.git" ]]; then
-    git -C "$dest" pull --ff-only || echo "WARNING: Could not update $dest"
+    git -C "$dest" pull --ff-only || FAILED+=("update $dest")
   elif [[ ! -e "$dest" ]]; then
-    git clone --depth=1 "$repo" "$dest" || echo "WARNING: Could not clone $repo"
+    git clone --depth=1 "$repo" "$dest" || FAILED+=("install $dest")
+  else
+    echo "  [preserved] $dest exists but is not a Git checkout."
   fi
 }
-clone_plugin https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k"
-clone_plugin https://github.com/zsh-users/zsh-autosuggestions.git "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
-clone_plugin https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
-clone_plugin https://github.com/marlonrichert/zsh-autocomplete.git "$ZSH_CUSTOM/plugins/zsh-autocomplete"
-clone_plugin https://github.com/zsh-users/zsh-history-substring-search.git "$ZSH_CUSTOM/plugins/zsh-history-substring-search"
+clone_plugin https://github.com/romkatv/powerlevel10k.git "$CUSTOM/themes/powerlevel10k"
+clone_plugin https://github.com/zsh-users/zsh-autosuggestions.git "$CUSTOM/plugins/zsh-autosuggestions"
+clone_plugin https://github.com/zsh-users/zsh-syntax-highlighting.git "$CUSTOM/plugins/zsh-syntax-highlighting"
+clone_plugin https://github.com/marlonrichert/zsh-autocomplete.git "$CUSTOM/plugins/zsh-autocomplete"
+clone_plugin https://github.com/zsh-users/zsh-history-substring-search.git "$CUSTOM/plugins/zsh-history-substring-search"
 
 ZRC="$HOME/.zshrc"
-if (( HAD_ZSHRC == 0 )); then
-  if [[ ! -f "$ZRC" && -f "$HOME/.oh-my-zsh/templates/zshrc.zsh-template" ]]; then
-    cp "$HOME/.oh-my-zsh/templates/zshrc.zsh-template" "$ZRC"
-  fi
-  sed -i 's|^[[:space:]]*ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' "$ZRC"
-  sed -i 's|^[[:space:]]*plugins=.*|plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)|' "$ZRC"
-  if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
-    cat >> "$ZRC" <<'EOF'
+if [[ ! -f "$ZRC" ]]; then
+  if [[ -f "$OMZ/templates/zshrc.zsh-template" ]]; then cp "$OMZ/templates/zshrc.zsh-template" "$ZRC"
+  else printf 'export ZSH="$HOME/.oh-my-zsh"\n' > "$ZRC"; fi
+fi
+if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
+  cp -p "$ZRC" "$ZRC.termax-backup-$(date +%Y%m%d-%H%M%S)"
+  python - "$ZRC" <<'PY'
+from pathlib import Path
+import re, sys
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+theme = 'ZSH_THEME="powerlevel10k/powerlevel10k"'
+plugins = 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)'
+if re.search(r'(?m)^\s*ZSH_THEME=.*$', text):
+    text = re.sub(r'(?m)^\s*ZSH_THEME=.*$', theme, text, count=1)
+if re.search(r'(?m)^\s*plugins=\(.*\)\s*$', text):
+    text = re.sub(r'(?m)^\s*plugins=\(.*\)\s*$', plugins, text, count=1)
+marker = 'source $ZSH/oh-my-zsh.sh'
+if marker not in text and 'source "$ZSH/oh-my-zsh.sh"' not in text:
+    text += '\nexport ZSH="$HOME/.oh-my-zsh"\n'
+    marker = 'source "$ZSH/oh-my-zsh.sh"'
+if theme not in text:
+    text = text.replace(marker, theme + '\n' + marker, 1)
+if plugins not in text:
+    text = text.replace(marker, plugins + '\n' + marker, 1)
+if 'TERMAX_MANAGED_ZSH' not in text:
+    text += '\n# TERMAX_MANAGED_ZSH\nexport PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+path.write_text(text, encoding="utf-8")
+PY
+fi
+if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+  cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+fi
+mkdir -p "$HOME/.local/bin"
 
-# TERMAX_MANAGED_ZSH: managed additions.
-export PATH="$HOME/.local/bin:$PATH"
-[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
-EOF
+echo
+echo "[5/6] Ensuring the existing Debian proot is available..."
+if ! command -v proot-distro >/dev/null 2>&1; then
+  FAILED+=("proot-distro command unavailable")
+elif ! proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo "  Debian distribution not found; installing it without touching other distributions..."
+  if ! proot-distro install debian; then
+    FAILED+=("install Debian proot distribution")
+  fi
+fi
+
+if command -v proot-distro >/dev/null 2>&1 && proot-distro login debian -- /bin/true >/dev/null 2>&1; then
+  echo
+  echo "[6/6] Installing Debian proot packages, Python environment and Zsh stack..."
+  PROOT_ARGS=(login debian -- /bin/bash --noprofile --norc "$PROOT_SCRIPT")
+  if [[ "${TERMAX_DEBUG:-0}" == "1" ]]; then
+    TERMAX_DEBUG=1 proot-distro "${PROOT_ARGS[@]}" install || FAILED+=("Debian proot bootstrap")
+  else
+    proot-distro "${PROOT_ARGS[@]}" install || FAILED+=("Debian proot bootstrap")
   fi
 else
-  cp -p "$ZRC" "$ZRC.termax-backup-$(date +%Y%m%d-%H%M%S)"
-  if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
-    cat >> "$ZRC" <<'EOF'
-
-# TERMAX_MANAGED_ZSH: managed additions; remove this block to disable.
-export PATH="$HOME/.local/bin:$PATH"
-EOF
-  fi
-  echo "Existing .zshrc backed up and preserved; theme/plugin settings were not overwritten."
+  FAILED+=("Debian proot unavailable; WW was left untouched")
 fi
 
-mkdir -p "$HOME/.local/bin"
+echo
 if (("${#FAILED[@]}" > 0)); then
-  echo "Bootstrap completed with failures: ${FAILED[*]}"
-  echo "Review the log: $LOG"
+  echo "TERMAX bootstrap completed with failures:"
+  printf '  - %s\n' "${FAILED[@]}"
+  echo "Review native log: $LOG"
   exit 1
 fi
-echo "Bootstrap complete."
-echo "No login-shell change was made. Review your shell settings before changing the login shell."
-echo "Termux:API also requires the separate Android Termux:API companion app."
+echo "TERMAX native Termux + Debian proot bootstrap complete."
+echo "Zsh/Oh My Zsh/Powerlevel10k are installed in both environments."
+echo "Existing .zshrc files were backed up before TERMAX changes."
+echo "WW's repository, virtualenv and cookies were not modified."
+echo "No login shell was changed automatically."
+echo "Termux:API also requires the separate Android companion app and permissions."
