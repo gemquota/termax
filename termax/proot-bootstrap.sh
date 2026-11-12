@@ -29,9 +29,9 @@ echo "============================================================"
 
 if [[ "$MODE" != "check" ]]; then
   echo "[1/5] Refreshing Debian package indexes..."
-  apt-get update
+  if ! apt-get update; then FAILED+=("Debian apt update"); fi
   echo "[2/5] Upgrading installed Debian packages..."
-  apt-get upgrade -y
+  if ! apt-get upgrade -y; then FAILED+=("Debian apt upgrade"); fi
 else
   echo "[1/5] Read-only Debian package inspection..."
 fi
@@ -65,7 +65,12 @@ fi
 if (("${#MISSING[@]}" > 0)); then
   echo "[3/5] Installing available Debian packages..."
   if ! apt-get install -y --no-install-recommends "${MISSING[@]}"; then
-    FAILED+=("Debian apt package transaction")
+    echo "Package batch failed; retrying each available Debian package separately..."
+    for package in "${MISSING[@]}"; do
+      if ! apt-get install -y --no-install-recommends "$package"; then
+        FAILED+=("Debian package: $package")
+      fi
+    done
   fi
 else
   echo "[3/5] Debian package manifest already satisfied."
@@ -80,7 +85,9 @@ if [[ ! -x "$VENV/bin/python" ]]; then
   fi
 fi
 if [[ -x "$VENV/bin/python" ]]; then
-  "$VENV/bin/python" -m pip install --upgrade pip
+  if ! "$VENV/bin/python" -m pip install --upgrade pip; then
+    FAILED+=("Debian TERMAX pip upgrade")
+  fi
   if ! "$VENV/bin/python" -m pip install -r "$PYTHON_FILE"; then
     FAILED+=("Debian Python requirements")
   fi
