@@ -124,6 +124,10 @@ if [[ -x "$VENV/bin/python" ]]; then
   fi
 fi
 
+mkdir -p "$HOME/.local/bin"
+if command -v fdfind >/dev/null 2>&1 && [[ ! -e "$HOME/.local/bin/fd" ]]; then ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"; fi
+if command -v batcat >/dev/null 2>&1 && [[ ! -e "$HOME/.local/bin/bat" ]]; then ln -s "$(command -v batcat)" "$HOME/.local/bin/bat"; fi
+
 echo "[5/5] Installing/configuring Debian Zsh, Oh My Zsh, Powerlevel10k and plugins..."
 if ! command -v zsh >/dev/null 2>&1; then
   FAILED+=("Debian zsh package unavailable")
