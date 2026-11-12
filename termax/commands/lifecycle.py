@@ -65,7 +65,12 @@ def _write_report(lines):
     if target.exists():
         print(f"Refusing to overwrite existing report: {target}", file=sys.stderr)
         return
-    target.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    try:
+        with target.open("x", encoding="utf-8") as stream:
+            stream.write("\n".join(lines).rstrip() + "\n")
+    except FileExistsError:
+        print(f"Refusing to overwrite existing report: {target}", file=sys.stderr)
+        return
     print(f"Report: {target}")
 
 def _package_state(package):
@@ -87,6 +92,8 @@ def _zsh_audit():
 def _repair_zsh(debug, failures):
     home = Path.home()
     omz = home / ".oh-my-zsh"
+    zshrc = home / ".zshrc"
+    had_zshrc = zshrc.exists()
     if not omz.is_dir():
         installer = 'RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
         print("Installing missing Oh My Zsh...")
@@ -105,14 +112,18 @@ def _repair_zsh(debug, failures):
                 failures.append("install " + relative)
         else:
             print(f"[SKIP] Preserving non-git directory: {destination}")
-    zshrc = home / ".zshrc"
-    if not zshrc.exists():
+    if not had_zshrc and not zshrc.exists():
         template = omz / "templates/zshrc.zsh-template"
         if template.is_file():
             zshrc.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
-            with zshrc.open("a", encoding="utf-8") as stream:
-                stream.write("\n# TERMAX_MANAGED_ZSH\nexport PATH=\"$HOME/.local/bin:$PATH\"\n")
-    else:
+    if not had_zshrc and zshrc.exists():
+        text = zshrc.read_text(encoding="utf-8")
+        text = text.replace('ZSH_THEME="robbyrussell"', 'ZSH_THEME="powerlevel10k/powerlevel10k"')
+        text = text.replace("plugins=(git)", "plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)")
+        if "TERMAX_MANAGED_ZSH" not in text:
+            text += "\n# TERMAX_MANAGED_ZSH\nexport PATH=\"$HOME/.local/bin:$PATH\"\n[[ -f \"$HOME/.p10k.zsh\" ]] && source \"$HOME/.p10k.zsh\"\n"
+        zshrc.write_text(text, encoding="utf-8")
+    elif had_zshrc:
         print("Existing .zshrc left untouched.")
 
 def new(args):
