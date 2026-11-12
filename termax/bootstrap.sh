@@ -179,7 +179,11 @@ if (("${#FINAL_MISSING[@]}" > 0)); then
 else
   echo "  All ${#packages[@]} requested native packages are installed."
 fi
-modules=(rich cloudscraper fastapi httplib2 opentelemetry requests requests_toolbelt uvicorn textual prompt_toolkit plotext networkx yaml typer)
+if [[ "${TERMAX_MINIMAL:-0}" == "1" ]]; then
+  modules=(rich)
+else
+  modules=(rich cloudscraper fastapi httplib2 opentelemetry requests requests_toolbelt uvicorn textual prompt_toolkit plotext networkx yaml typer)
+fi
 for module in "${modules[@]}"; do
   if ! python -c "import $module" >/dev/null 2>&1; then FAILED+=("native Python module: $module"); fi
 done
