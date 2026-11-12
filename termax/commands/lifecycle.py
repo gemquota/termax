@@ -205,7 +205,8 @@ def new(args):
     if args.check:
         missing = [p for p in packages if not _package_state(p)]
         modules = probe()["modules"]
-        missing_modules = [name for name, present in modules.items() if not present]
+        module_scope = {"rich": modules.get("rich", False)} if args.minimal else modules
+        missing_modules = [name for name, present in module_scope.items() if not present]
         shell = _zsh_audit()
         missing_shell = [name for name, present in shell.items() if not present]
         print(f"Read-only preview: {len(missing)} native Termux packages missing.")
