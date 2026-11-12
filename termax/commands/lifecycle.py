@@ -46,6 +46,8 @@ def _report_path():
     if not default.exists():
         return default
     dated = Path.home() / f"termax-report-{time.strftime('%Y%m%d-%H%M%S')}.txt"
+    if dated.exists():
+        dated = dated.with_name(dated.stem + f"-{os.getpid()}" + dated.suffix)
     print(f"Report already exists: {default}")
     if sys.stdin.isatty():
         answer = input(f"Use dated report {dated.name}? [Y/n] ").strip().lower()
@@ -217,6 +219,8 @@ def up(args):
     print("Repairing and updating the managed Zsh tools...")
     _repair_zsh(args.debug, failures)
     final_missing = [p for p in packages if not _package_state(p)]
+    final_data = probe()
+    final_missing_modules = [name for name, present in final_data["modules"].items() if not present]
     zsh_checks = _zsh_audit()
     missing_shell = [name for name, present in zsh_checks.items() if not present]
     lines += [
@@ -224,19 +228,21 @@ def up(args):
         "Actions: pkg update, pkg upgrade, install missing packages, Python requirements, Zsh component repair",
         f"Final missing packages: {len(final_missing)}",
         "Final missing: " + (", ".join(final_missing) if final_missing else "none"),
+        f"Final missing Python modules: {len(final_missing_modules)}",
+        "Final missing modules: " + (", ".join(final_missing_modules) if final_missing_modules else "none"),
         f"Missing Zsh components: {len(missing_shell)}",
         "Missing Zsh components: " + (", ".join(missing_shell) if missing_shell else "none"),
         "Failures: " + (", ".join(failures) if failures else "none"),
         "", "DIAGNOSTICS",
     ]
-    for name, path in data["commands"].items():
+    for name, path in final_data["commands"].items():
         lines.append(f"{name}: {path or 'missing'}")
-    for name, present in data["modules"].items():
+    for name, present in final_data["modules"].items():
         lines.append(f"python module {name}: {'present' if present else 'missing'}")
     for name, present in zsh_checks.items():
         lines.append(f"{name}: {'present' if present else 'missing'}")
     _write_report(lines)
-    if failures or final_missing or missing_shell:
+    if failures or final_missing or final_missing_modules or missing_shell:
         print("Maintenance finished with issues. See the report.")
         return 1
     print("Maintenance and final audit complete.")
