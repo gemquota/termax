@@ -163,6 +163,9 @@ def up(args):
     data = probe()
     packages = _manifest(PACKAGE_MANIFEST)
     missing = [p for p in packages if not _package_state(p)]
+    zsh_preflight = _zsh_audit()
+    missing_shell_preflight = [name for name, present in zsh_preflight.items() if not present]
+    missing_modules = [name for name, present in data["modules"].items() if not present]
     lines = [
         "TERMAX MAINTENANCE REPORT",
         f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S %Z')}",
@@ -175,11 +178,25 @@ def up(args):
         f"Manifest packages: {len(packages)}",
         f"Missing packages: {len(missing)}",
         "Missing: " + (", ".join(missing) if missing else "none"),
+        f"Missing Python modules: {len(missing_modules)}",
+        "Missing modules: " + (", ".join(missing_modules) if missing_modules else "none"),
+        f"Missing Zsh components: {len(missing_shell_preflight)}",
+        "Missing Zsh components: " + (", ".join(missing_shell_preflight) if missing_shell_preflight else "none"),
+        "",
+        "PROPOSED ACTION PLAN",
+        "1. Refresh Termux package indexes.",
+        "2. Upgrade installed Termux packages.",
+        "3. Install missing packages from the TERMAX manifest.",
+        "4. Refresh declared Python dependencies.",
+        "5. Repair/update Oh My Zsh, Powerlevel10k and managed plugins.",
+        "6. Run the final environment audit.",
     ]
     print("TERMAX preflight complete.")
-    print(f"Packages missing: {len(missing)}")
+    print(f"Packages missing: {len(missing)} | Python modules missing: {len(missing_modules)} | Zsh components missing: {len(missing_shell_preflight)}")
     if args.check:
-        print("READ-ONLY CHECK: no changes will be made.")
+        print("READ-ONLY CHECK: proposed actions follow; no changes will be made.")
+        for item in lines[lines.index("PROPOSED ACTION PLAN") + 1:]:
+            print(item)
         lines += ["", "MODE: read-only check", "No changes applied."]
         _write_report(lines)
         return 0
