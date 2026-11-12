@@ -12,7 +12,7 @@ class InstallerTests(unittest.TestCase):
  def test_apply_installs_both_launchers(self):
   with tempfile.TemporaryDirectory() as d:
    h=Path(d); r=self.run_it("--apply",home=h); self.assertEqual(r.returncode,0,r.stderr)
-   self.assertEqual((h/".local/share/termax/VERSION").read_text().strip(),"0.3.0")
+   self.assertEqual((h/".local/share/termax/VERSION").read_text().strip(),"0.4.0")
    self.assertTrue((h/".local/bin/termax").exists()); self.assertTrue((h/".local/bin/tx").exists())
  def test_upgrade_preserves_backup(self):
   with tempfile.TemporaryDirectory() as d:
