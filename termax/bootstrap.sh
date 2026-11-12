@@ -89,7 +89,6 @@ clone_plugin() {
 clone_plugin https://github.com/romkatv/powerlevel10k.git "$CUSTOM/themes/powerlevel10k"
 clone_plugin https://github.com/zsh-users/zsh-autosuggestions.git "$CUSTOM/plugins/zsh-autosuggestions"
 clone_plugin https://github.com/zsh-users/zsh-syntax-highlighting.git "$CUSTOM/plugins/zsh-syntax-highlighting"
-clone_plugin https://github.com/marlonrichert/zsh-autocomplete.git "$CUSTOM/plugins/zsh-autocomplete"
 clone_plugin https://github.com/zsh-users/zsh-history-substring-search.git "$CUSTOM/plugins/zsh-history-substring-search"
 
 ZRC="$HOME/.zshrc"
@@ -104,7 +103,7 @@ path = Path(sys.argv[1])
 original = path.read_text(encoding="utf-8")
 text = original
 theme = 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-plugins = 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)'
+plugins = 'plugins=(git zsh-autosuggestions zsh-history-substring-search colored-man-pages zsh-syntax-highlighting)'
 source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*$'
 match = re.search(source_pattern, text)
 if not re.search(r'(?m)^\s*export\s+ZSH=', text):
@@ -123,7 +122,7 @@ set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*$')
 set_before_omz(plugins, r'(?m)^\s*plugins=\(.*\)\s*$')
 if not re.search(source_pattern, text):
     text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
-if "TERMAX_MANAGED_ZSH" not in text:
+history_block = """\n# TERMAX_HISTORY_KEYS\nHISTORY_SUBSTRING_SEARCH_ENSURE_UNIQUE=1\nbindkey '^[[A' history-substring-search-up\nbindkey '^[[B' history-substring-search-down\nbindkey '^[OA' history-substring-search-up\nbindkey '^[OB' history-substring-search-down\nbindkey -M emacs '^P' history-substring-search-up\nbindkey -M emacs '^N' history-substring-search-down\n"""\nif "TERMAX_HISTORY_KEYS" not in text:\n    text += history_block\nif "TERMAX_MANAGED_ZSH" not in text:
     text += "\n# TERMAX_MANAGED_ZSH\n"
 if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
     text += 'export PATH="$HOME/.local/bin:$PATH"\n'
@@ -137,6 +136,7 @@ if text != original:
         print(f"  Backed up previous Zsh config: {backup}")
     path.write_text(text, encoding="utf-8")
 PY
+rm -f "$HOME"/.zcompdump*(N) 2>/dev/null || true
 if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
   cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
 fi
