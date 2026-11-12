@@ -49,7 +49,7 @@ def _proot_ready():
     )
     return result.returncode == 0
 
-def _proot_run(mode, debug=False, stream=True):
+def _proot_run(mode, debug=False, stream=True, minimal=False):
     script = ROOT / "termax" / "proot-bootstrap.sh"
     if not script.is_file():
         print("Debian proot bootstrap module is missing:", script, file=sys.stderr)
@@ -57,6 +57,8 @@ def _proot_run(mode, debug=False, stream=True):
     env = os.environ.copy()
     if debug:
         env["TERMAX_DEBUG"] = "1"
+    if minimal:
+        env["TERMAX_MINIMAL"] = "1"
     command = [
         "proot-distro", "login", "debian", "--",
         "/bin/bash", "--noprofile", "--norc", str(script), mode,
@@ -183,7 +185,7 @@ def new(args):
             print("Would install:", ", ".join(missing))
         if _proot_ready():
             print("Debian proot is present. Checking its package manifest...")
-            _proot_run("check", debug=args.debug, stream=True)
+            _proot_run("check", debug=args.debug, stream=True, minimal=args.minimal)
         else:
             print("Debian proot is absent or not ready; tx new will install the Debian distribution and its TERMAX package set.")
         return 0
