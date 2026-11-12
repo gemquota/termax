@@ -25,6 +25,6 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q install.py termax tools tests
       - name: Check internal bootstrap shell syntax
-        run: bash -n termax/bootstrap.sh
+        run: bash -n termax/bootstrap.sh && bash -n termax/proot-bootstrap.sh
       - name: Run tests
         run: python -m unittest discover -s tests -v
