@@ -18,7 +18,7 @@ class LifecyclePreflightTests(unittest.TestCase):
             with (
                 mock.patch.object(lifecycle, "_is_termux", return_value=True),
                 mock.patch.object(lifecycle, "probe", return_value=probe),
-                mock.patch.object(lifecycle, "_manifest", side_effect=[["git"], ["rich"]]),
+                mock.patch.object(lifecycle, "_manifest", side_effect=[["git"], ["rich"], ["zsh"]]),
                 mock.patch.object(lifecycle, "_package_state", return_value=True),
                 mock.patch.object(lifecycle, "_zsh_audit", return_value={"Oh My Zsh": True}),
                 mock.patch.object(lifecycle, "_write_report") as report,

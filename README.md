@@ -1,6 +1,6 @@
 # TERMAX
 
-TERMAX is the unified native Termux environment bootstrap and maintenance command centre.
+TERMAX bootstraps and maintains both the native Termux environment and the user's Debian proot environment from one command centre.
 
 ## Install
 
@@ -14,7 +14,7 @@ TERMAX is the unified native Termux environment bootstrap and maintenance comman
     tx new --check
     tx new
 
-The installer stages TERMAX and creates both `termax` and `tx` launchers. Run `tx new` for the complete native Termux environment bootstrap. Use `tx new --minimal` for the essential package set or `tx new --check` for a read-only preview. Full setup is the default.
+The installer stages TERMAX and creates both `termax` and `tx` launchers. Run `tx new` for the complete native Termux **and Debian proot** environment bootstrap. It installs the Termux package manifest natively, then installs Debian equivalents inside the existing `debian` proot. Both environments receive Zsh, Oh My Zsh, Powerlevel10k, the managed Zsh plugins, and the declared Python dependencies. Use `tx new --minimal` for the essential toolchain or `tx new --check` for a read-only preview. Full setup is the default.
 
 ## Commands
 
@@ -36,8 +36,8 @@ Every command has a full name and a short alias. Both forms behave identically.
 ## Bootstrap and maintenance
 
 - `tx new`: full setup by default; supports `--minimal`, `--full`, `--check`, and `--debug`.
-- `tx up`: automatically runs preflight, updates Termux packages, installs missing manifest packages, refreshes Python requirements, performs a final audit, and writes `~/termax-report.txt`.
-- `tx up --check`: read-only preflight for missing Termux packages, Python modules, and Zsh components. It prints and reports the proposed maintenance plan without applying changes.
+- `tx up`: automatically runs preflight, updates native Termux packages, repairs the native Zsh stack, maintains Debian apt packages and its separate TERMAX Python venv, repairs the Debian Zsh stack, performs final audits in both environments, and writes `~/termax-report.txt`.
+- `tx up --check`: read-only preflight for native Termux packages, Debian apt equivalents, Python modules, and Zsh components in both environments. It prints and reports the proposed maintenance plan without applying changes.
 - `tx up --debug`: same maintenance workflow with detailed command output.
 - Safe package updates and missing-manifest-package installs are automatic. TERMAX does not silently remove packages or overwrite personal configuration.
 - Reports are never silently overwritten. If the default report exists, TERMAX offers a timestamped filename or another path.
@@ -46,7 +46,7 @@ Diagnostics are internal to `tx up`; there are no separate `doctor`, `status`, `
 
 ## WW integration
 
-WW remains installed in Debian proot. TERMAX invokes the existing installation and does not reinstall WW, move its virtual environment, or touch its cookies.
+WW remains installed in Debian proot. TERMAX installs its own separate Debian Python environment at `~/.local/share/termax/venv`; it does not reuse or replace WW's `.venv`, move the WW repository, or touch WW cookies. Debian-only packages that have no equivalent in the configured apt repositories are reported rather than silently substituted. Android-specific packages such as Termux:API remain native Termux packages.
 
     tx ask "Explain this Python traceback"
 

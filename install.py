@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""TERMAX 0.3.0 staged application installer. Preview is read-only."""
+"""TERMAX 0.4.0 staged application installer. Preview is read-only."""
 import argparse, os, shutil, sys, time
 from pathlib import Path
 SRC=Path(__file__).resolve().parent
 HOME=Path.home(); APP=HOME/".local/share/termax"; BIN=HOME/".local/bin"
-VERSION="0.3.0"
+VERSION="0.4.0"
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=f"Install TERMAX {VERSION} (preview by default)")
@@ -18,7 +18,7 @@ def main(argv=None):
         return 0
     required=("termax/__init__.py","termax/cli.py","termax/registry.py","termax/backup.py",
               "termax/browser.py","termax/system.py","termax/commands/lifecycle.py",
-              "termax/commands/ww.py","config/plugins.json","config/aliases.json","config/functions.json",
+              "termax/commands/ww.py","termax/proot-bootstrap.sh","config/debian-packages.txt","config/plugins.json","config/aliases.json","config/functions.json",
               "config/termux-packages.txt","config/python-requirements.txt","termax/bootstrap.sh")
     missing=[x for x in required if not (SRC/x).is_file()]
     if missing:
