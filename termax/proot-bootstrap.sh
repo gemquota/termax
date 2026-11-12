@@ -53,6 +53,26 @@ for package in "${AVAILABLE[@]}"; do
 done
 echo "Debian manifest: ${#packages[@]} | available: ${#AVAILABLE[@]} | unavailable in configured apt sources: ${#UNAVAILABLE[@]} | missing: ${#MISSING[@]}"
 if (("${#MISSING[@]}" > 0)); then printf '  missing: %s\n' "${MISSING[*]}"; fi
+FINAL_MISSING=()
+for package in "${AVAILABLE[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+    FINAL_MISSING+=("$package")
+  fi
+done
+ZSH_MISSING=()
+[[ -d "$HOME/.oh-my-zsh" ]] || ZSH_MISSING+=("Oh My Zsh")
+[[ -f "$HOME/.zshrc" ]] || ZSH_MISSING+=(".zshrc")
+[[ -f "$HOME/.p10k.zsh" ]] || ZSH_MISSING+=(".p10k.zsh")
+[[ -d "$CUSTOM/themes/powerlevel10k" ]] || ZSH_MISSING+=("Powerlevel10k")
+for plugin in zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search; do
+  [[ -d "$CUSTOM/plugins/$plugin" ]] || ZSH_MISSING+=("$plugin")
+done
+[[ -x "$VENV/bin/python" ]] || ZSH_MISSING+=("TERMAX Python venv")
+echo "Final Debian package audit: ${#FINAL_MISSING[@]} missing."
+if (("${#FINAL_MISSING[@]}" > 0)); then printf '  still missing: %s\n' "${FINAL_MISSING[*]}"; FAILED+=("Debian final package audit"); fi
+echo "Final Debian Zsh/Python audit: ${#ZSH_MISSING[@]} missing."
+if (("${#ZSH_MISSING[@]}" > 0)); then printf '  still missing: %s\n' "${ZSH_MISSING[*]}"; FAILED+=("Debian final Zsh/Python audit"); fi
+
 if (("${#UNAVAILABLE[@]}" > 0)); then printf '  not packaged here: %s\n' "${UNAVAILABLE[*]}"; fi
 
 if [[ "$MODE" == "check" ]]; then
