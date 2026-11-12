@@ -19,7 +19,7 @@ def main(argv=None):
     required=("termax/__init__.py","termax/cli.py","termax/registry.py","termax/backup.py",
               "termax/browser.py","termax/system.py","termax/commands/lifecycle.py",
               "termax/commands/ww.py","config/plugins.json","config/aliases.json","config/functions.json",
-              "config/termux-packages.txt","config/python-requirements.txt","setup-termux.sh")
+              "config/termux-packages.txt","config/python-requirements.txt")
     missing=[x for x in required if not (SRC/x).is_file()]
     if missing:
         print("REFUSED: incomplete source tree:",", ".join(missing),file=sys.stderr)
@@ -33,7 +33,6 @@ def main(argv=None):
         for folder in ("termax","config","legacy"):
             if (SRC/folder).is_dir():
                 shutil.copytree(SRC/folder,staging/folder)
-        shutil.copy2(SRC/"setup-termux.sh",staging/"setup-termux.sh")
         (staging/"VERSION").write_text(VERSION+"\n",encoding="utf-8")
         if APP.exists(): APP.rename(backup)
         try: staging.rename(APP)
