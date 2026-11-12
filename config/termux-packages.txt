@@ -48,6 +48,7 @@ nodejs
 npm
 openssh
 pipes.sh
+proot-distro
 poppler
 procps
 python
