@@ -89,6 +89,9 @@ clone_plugin https://github.com/zsh-users/zsh-history-substring-search.git "$ZSH
 
 ZRC="$HOME/.zshrc"
 if (( HAD_ZSHRC == 0 )); then
+  if [[ ! -f "$ZRC" && -f "$HOME/.oh-my-zsh/templates/zshrc.zsh-template" ]]; then
+    cp "$HOME/.oh-my-zsh/templates/zshrc.zsh-template" "$ZRC"
+  fi
   sed -i 's|^[[:space:]]*ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' "$ZRC"
   sed -i 's|^[[:space:]]*plugins=.*|plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)|' "$ZRC"
   if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
