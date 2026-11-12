@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""TERMAX 0.3.0 staged application installer. Preview is read-only."""
+"""TERMAX 0.4.0 staged application installer. Preview is read-only."""
 import argparse, os, shutil, sys, time
 from pathlib import Path
 SRC=Path(__file__).resolve().parent
 HOME=Path.home(); APP=HOME/".local/share/termax"; BIN=HOME/".local/bin"
-VERSION="0.3.0"
+VERSION="0.4.0"
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=f"Install TERMAX {VERSION} (preview by default)")
