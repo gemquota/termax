@@ -197,7 +197,8 @@ if text != original:
     backup.write_text(original, encoding="utf-8")
     print(f"  Backed up previous Zsh config: {backup}")
     path.write_text(text, encoding="utf-8")
-PY  if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+PY
+  if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
     cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
   fi
 fi
