@@ -46,7 +46,7 @@ def browse(start="."):
         here=root; back=[]; forward=[]; idx=0; clip=[]; cut=False; msg="Enter open | Backspace back | u up | c copy | x cut | p paste | v preview | q quit"
         while True:
             win.erase(); h,w=win.getmaxyx()
-            win.addnstr(0,0," TERMAX 0.2.9  "+str(here),max(1,w-1),curses.A_REVERSE)
+            win.addnstr(0,0," TERMAX 0.3.0  "+str(here),max(1,w-1),curses.A_REVERSE)
             try: rows=entries(here)
             except OSError as e: rows=[]; msg=str(e)
             idx=max(0,min(idx,len(rows)-1))

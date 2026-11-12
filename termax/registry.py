@@ -1,17 +1,21 @@
+"""Canonical public command inventory. Diagnostics are internal to tx up."""
 from dataclasses import dataclass
+
 @dataclass(frozen=True)
 class Command:
     name: str
+    alias: str
     summary: str
-    module: str
-    function: str
+
 COMMANDS = (
-    Command("doctor","Check platform and capabilities.","termax.commands.core","doctor"),
-    Command("status","Show device and TERMAX status.","termax.commands.core","status"),
-    Command("dashboard","Show terminal dashboard.","termax.commands.core","dashboard"),
-    Command("workspace","Inspect Zellij and tmux.","termax.commands.workspace","workspace"),
-    Command("ask","Ask Gemini through the existing WW installation in Debian proot.","termax.commands.ww","ask"),
-    Command("plugin","List optional integrations.","termax.commands.config","plugin"),
-    Command("config","Show alias and function registries.","termax.commands.config","config"),
-    Command("nexus-legacy","Run preserved NEXUS dashboard.","termax.commands.core","nexus_legacy"),
+    Command("new", "n", "Bootstrap the complete native Termux environment."),
+    Command("up", "u", "Maintain, repair, audit and report."),
+    Command("ask", "a", "Ask Gemini through the existing WW installation."),
+    Command("workspace", "ws", "Inspect terminal workspace tools."),
+    Command("files", "fm", "Open the interactive file manager."),
+    Command("list", "ls", "List files."),
+    Command("save", "s", "Create a safe TERMAX configuration archive."),
+    Command("load", "l", "Validate and restore a saved archive."),
+    Command("config", "c", "Show TERMAX configuration."),
+    Command("plugins", "p", "List TERMAX integrations."),
 )
