@@ -97,35 +97,46 @@ if [[ ! -f "$ZRC" ]]; then
   if [[ -f "$OMZ/templates/zshrc.zsh-template" ]]; then cp "$OMZ/templates/zshrc.zsh-template" "$ZRC"
   else printf 'export ZSH="$HOME/.oh-my-zsh"\n' > "$ZRC"; fi
 fi
-if ! grep -q 'TERMAX_MANAGED_ZSH' "$ZRC"; then
-  cp -p "$ZRC" "$ZRC.termax-backup-$(date +%Y%m%d-%H%M%S)"
-  python - "$ZRC" <<'PY'
+python - "$ZRC" <<'PY'
 from pathlib import Path
 import re, sys
 path = Path(sys.argv[1])
-text = path.read_text(encoding="utf-8")
+original = path.read_text(encoding="utf-8")
+text = original
 theme = 'ZSH_THEME="powerlevel10k/powerlevel10k"'
 plugins = 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)'
-if re.search(r'(?m)^\s*ZSH_THEME=.*$', text):
-    text = re.sub(r'(?m)^\s*ZSH_THEME=.*$', theme, text, count=1)
-if re.search(r'(?m)^\s*plugins=\(.*\)\s*$', text):
-    text = re.sub(r'(?m)^\s*plugins=\(.*\)\s*$', plugins, text, count=1)
-marker = 'source $ZSH/oh-my-zsh.sh'
-if marker not in text and 'source "$ZSH/oh-my-zsh.sh"' not in text:
-    text += '\nexport ZSH="$HOME/.oh-my-zsh"\n'
-    marker = 'source "$ZSH/oh-my-zsh.sh"'
-if theme not in text:
-    text = text.replace(marker, theme + '\n' + marker, 1)
-if plugins not in text:
-    text = text.replace(marker, plugins + '\n' + marker, 1)
-if 'TERMAX_MANAGED_ZSH' not in text:
-    text += '\n# TERMAX_MANAGED_ZSH\nexport PATH="$HOME/.local/bin:$PATH"\n'
+source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*$'
+match = re.search(source_pattern, text)
+if not re.search(r'(?m)^\s*export\s+ZSH=', text):
+    text = 'export ZSH="$HOME/.oh-my-zsh"\n' + text
+def set_before_omz(line, pattern):
+    global text
+    if re.search(pattern, text):
+        text = re.sub(pattern, lambda _: line, text, count=1)
+    else:
+        found = re.search(source_pattern, text)
+        if found:
+            text = text[:found.start()] + line + "\n" + text[found.start():]
+        else:
+            text += "\n" + line + "\n"
+set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*$')
+set_before_omz(plugins, r'(?m)^\s*plugins=\(.*\)\s*$')
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
 if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
     text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
-path.write_text(text, encoding="utf-8")
-PY
-fi
-if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+if text != original:
+    if path.exists() and original:
+        import time
+        backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
+        backup.write_text(original, encoding="utf-8")
+        print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
+PYif [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
   cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
 fi
 mkdir -p "$HOME/.local/bin"
