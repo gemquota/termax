@@ -184,9 +184,50 @@ path = Path(sys.argv[1])
 original = path.read_text(encoding="utf-8")
 text = original
 theme = 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-source_pattern = r'(?m)^\\s*source\\s+["\\']?\\$ZSH/oh-my-zsh\\.sh["\\']?\\s*
+source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*$'
+if not re.search(r'(?m)^\s*export\s+ZSH=', text):
+    text = 'export ZSH="$HOME/.oh-my-zsh"\n' + text
+def set_before_omz(line, pattern):
+    global text
+    if re.search(pattern, text):
+        text = re.sub(pattern, lambda _: line, text, count=1)
+    else:
+        found = re.search(source_pattern, text)
+        if found:
+            text = text[:found.start()] + line + "\n" + text[found.start():]
+        else:
+            text += "\n" + line + "\n"
+# Keep a user's chosen theme. Select Powerlevel10k only when no theme is configured.
+if not re.search(r'(?m)^\s*ZSH_THEME=', text):
+    set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*$')
+# Keep the user's plugin array intact and append TERMAX components exactly once.
+if "TERMAX_MANAGED_PLUGINS" not in text:
+    if not re.search(r'(?m)^\s*plugins\s*=\s*\(', text):
+        set_before_omz("plugins=(git)", r'(?m)^\s*plugins\s*=\s*\(.*\)\s*$')
+    plugin_block = "# TERMAX_MANAGED_PLUGINS\nplugins+=(zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)\n"
+    found = re.search(source_pattern, text)
+    if found:
+        text = text[:found.start()] + plugin_block + text[found.start():]
+    else:
+        text += "\n" + plugin_block
+if not re.search(source_pattern, text):
+    text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
+if "TERMAX_MANAGED_ZSH" not in text:
+    text += "\n# TERMAX_MANAGED_ZSH\n"
+if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
+    text += 'export PATH="$HOME/.local/bin:$PATH"\n'
+if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
+    text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
+if text != original:
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = path.with_name(path.name + ".termax-backup-" + stamp)
+    if backup.exists():
+        backup = path.with_name(path.name + ".termax-backup-" + stamp + f"-{time.time_ns()}")
+    backup.write_text(original, encoding="utf-8")
+    print(f"  Backed up previous Zsh config: {backup}")
+    path.write_text(text, encoding="utf-8")
 PY
-  if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
+ && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
     cp "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
   fi
 fi
