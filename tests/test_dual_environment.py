@@ -1,3 +1,7 @@
+import re
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -25,6 +29,32 @@ class DualEnvironmentBootstrapTests(unittest.TestCase):
             self.assertIn("p10k-lean.zsh", script)
             self.assertIn("zsh-autocomplete", script)
             self.assertIn("zsh-history-substring-search", script)
+
+    def test_bootstraps_preserve_user_plugins_and_theme(self):
+        fixture = (
+            'export ZSH="$HOME/.oh-my-zsh"\n'
+            'ZSH_THEME="agnoster"\n'
+            'plugins=(git docker kubectl)\n'
+            'source "$ZSH/oh-my-zsh.sh"\n'
+        )
+        for relative in ("termax/bootstrap.sh", "termax/proot-bootstrap.sh"):
+            script = (ROOT / relative).read_text(encoding="utf-8")
+            match = re.search(r"python(?:3)? - \"\\$ZRC\" <<'PY'\\n(.*?)\\nPY", script, re.S)
+            self.assertIsNotNone(match, relative)
+            with tempfile.TemporaryDirectory() as directory:
+                zshrc = Path(directory) / ".zshrc"
+                zshrc.write_text(fixture, encoding="utf-8")
+                result = subprocess.run(
+                    [sys.executable, "-c", match.group(1), str(zshrc)],
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                updated = zshrc.read_text(encoding="utf-8")
+                self.assertIn('plugins=(git docker kubectl)', updated)
+                self.assertIn('plugins+=(zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)', updated)
+                self.assertIn('ZSH_THEME="agnoster"', updated)
+                self.assertEqual(updated.count("TERMAX_MANAGED_PLUGINS"), 1)
+                self.assertEqual(updated.count("zsh-autosuggestions"), 1)
 
     def test_debian_audit_variables_are_defined_before_any_audit(self):
         proot = (ROOT / "termax/proot-bootstrap.sh").read_text(encoding="utf-8")
