@@ -56,6 +56,30 @@ class DualEnvironmentBootstrapTests(unittest.TestCase):
                 self.assertEqual(updated.count("TERMAX_MANAGED_PLUGINS"), 1)
                 self.assertEqual(updated.count("zsh-autosuggestions"), 1)
 
+    def test_default_oh_my_zsh_theme_switches_to_powerlevel10k(self):
+        fixture = (
+            'export ZSH="$HOME/.oh-my-zsh"\n'
+            'ZSH_THEME="robbyrussell"\n'
+            'plugins=(git zsh-autosuggestions)\n'
+            'source "$ZSH/oh-my-zsh.sh"\n'
+        )
+        for relative in ("termax/bootstrap.sh", "termax/proot-bootstrap.sh"):
+            script = (ROOT / relative).read_text(encoding="utf-8")
+            match = re.search(r"python(?:3)? - \"\\$ZRC\" <<'PY'\\n(.*?)\\nPY", script, re.S)
+            self.assertIsNotNone(match, relative)
+            with tempfile.TemporaryDirectory() as directory:
+                zshrc = Path(directory) / ".zshrc"
+                zshrc.write_text(fixture, encoding="utf-8")
+                result = subprocess.run(
+                    [sys.executable, "-c", match.group(1), str(zshrc)],
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                updated = zshrc.read_text(encoding="utf-8")
+                self.assertIn('ZSH_THEME="powerlevel10k/powerlevel10k"', updated)
+                self.assertIn('plugins=("${(@u)plugins}")', updated)
+                self.assertIn('plugins=(git zsh-autosuggestions)', updated)
+
     def test_debian_audit_variables_are_defined_before_any_audit(self):
         proot = (ROOT / "termax/proot-bootstrap.sh").read_text(encoding="utf-8")
         self.assertLess(proot.index('CUSTOM="${ZSH_CUSTOM:-'), proot.index('if [[ "$MODE" == "check" ]]'))
