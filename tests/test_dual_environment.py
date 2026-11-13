@@ -65,7 +65,7 @@ class DualEnvironmentBootstrapTests(unittest.TestCase):
         )
         for relative in ("termax/bootstrap.sh", "termax/proot-bootstrap.sh"):
             script = (ROOT / relative).read_text(encoding="utf-8")
-            match = re.search(r"python(?:3)? - \"\\$ZRC\" <<'PY'\\n(.*?)\\nPY", script, re.S)
+            match = re.search(r"python(?:3)? - \"\$ZRC\" <<'PY'\n(.*?)\nPY", script, re.S)
             self.assertIsNotNone(match, relative)
             with tempfile.TemporaryDirectory() as directory:
                 zshrc = Path(directory) / ".zshrc"
