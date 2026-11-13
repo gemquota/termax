@@ -205,7 +205,7 @@ if theme_match is None or theme_match.group(1).strip() == "robbyrussell":
 if "TERMAX_MANAGED_PLUGINS" not in text:
     if not re.search(r'(?m)^\s*plugins\s*=\s*\(', text):
         set_before_omz("plugins=(git)", r'(?m)^\s*plugins\s*=\s*\(.*\)\s*$')
-    plugin_block = '# TERMAX_MANAGED_PLUGINS\nplugins+=(zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)\nplugins=("' + '
+    plugin_block = '# TERMAX_MANAGED_PLUGINS\nplugins+=(zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)\nplugins=("${(@u)plugins}")\n'
     found = re.search(source_pattern, text)
     if found:
         text = text[:found.start()] + plugin_block + text[found.start():]
