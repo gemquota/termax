@@ -99,14 +99,12 @@ if [[ ! -f "$ZRC" ]]; then
 fi
 python - "$ZRC" <<'PY'
 from pathlib import Path
-import re, sys
+import re, sys, time
 path = Path(sys.argv[1])
 original = path.read_text(encoding="utf-8")
 text = original
 theme = 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-plugins = 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)'
 source_pattern = r'(?m)^\s*source\s+["\']?\$ZSH/oh-my-zsh\.sh["\']?\s*$'
-match = re.search(source_pattern, text)
 if not re.search(r'(?m)^\s*export\s+ZSH=', text):
     text = 'export ZSH="$HOME/.oh-my-zsh"\n' + text
 def set_before_omz(line, pattern):
@@ -119,8 +117,20 @@ def set_before_omz(line, pattern):
             text = text[:found.start()] + line + "\n" + text[found.start():]
         else:
             text += "\n" + line + "\n"
-set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*$')
-set_before_omz(plugins, r'(?m)^\s*plugins=\(.*\)\s*$')
+# Preserve custom themes, but replace Oh My Zsh's stock default with Powerlevel10k.
+theme_match = re.search(r'(?m)^\s*ZSH_THEME\s*=\s*["\']?([^"\']+)["\']?\s*$', text)
+if theme_match is None or theme_match.group(1).strip() == "robbyrussell":
+    set_before_omz(theme, r'(?m)^\s*ZSH_THEME=.*$')
+# Preserve the user's plugin array and append TERMAX plugins exactly once.
+if "TERMAX_MANAGED_PLUGINS" not in text:
+    if not re.search(r'(?m)^\s*plugins\s*=\s*\(', text):
+        set_before_omz("plugins=(git)", r'(?m)^\s*plugins\s*=\s*\(.*\)\s*$')
+    plugin_block = '# TERMAX_MANAGED_PLUGINS\nplugins+=(zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete zsh-history-substring-search colored-man-pages)\nplugins=("' + "$" + '{(@u)plugins}")\n'
+    found = re.search(source_pattern, text)
+    if found:
+        text = text[:found.start()] + plugin_block + text[found.start():]
+    else:
+        text += "\n" + plugin_block
 if not re.search(source_pattern, text):
     text += '\nsource "$ZSH/oh-my-zsh.sh"\n'
 if "TERMAX_MANAGED_ZSH" not in text:
@@ -130,11 +140,12 @@ if 'export PATH="$HOME/.local/bin:$PATH"' not in text:
 if 'source "$HOME/.p10k.zsh"' not in text and 'source ~/.p10k.zsh' not in text:
     text += '[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"\n'
 if text != original:
-    if path.exists() and original:
-        import time
-        backup = path.with_name(path.name + ".termax-backup-" + time.strftime("%Y%m%d-%H%M%S"))
-        backup.write_text(original, encoding="utf-8")
-        print(f"  Backed up previous Zsh config: {backup}")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = path.with_name(path.name + ".termax-backup-" + stamp)
+    if backup.exists():
+        backup = path.with_name(path.name + ".termax-backup-" + stamp + f"-{time.time_ns()}")
+    backup.write_text(original, encoding="utf-8")
+    print(f"  Backed up previous Zsh config: {backup}")
     path.write_text(text, encoding="utf-8")
 PY
 if [[ ! -f "$HOME/.p10k.zsh" && -f "$CUSTOM/themes/powerlevel10k/config/p10k-lean.zsh" ]]; then
